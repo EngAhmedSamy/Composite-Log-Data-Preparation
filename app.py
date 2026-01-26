@@ -122,7 +122,7 @@ def generate_bit_png(bit_no, size, depth_in, icon_bytes):
     #draw.line([(underline_start, underline_y), (underline_end, underline_y)], fill="black", width=4)
 
     # ── Bit icon ────────────────────────────────────────────────────────
-    icon_y_start = 160          # starts quite high
+    icon_y_start = 170          # starts quite high
     if icon_bytes:
         icon = Image.open(io.BytesIO(icon_bytes))
         
@@ -188,6 +188,7 @@ with zipfile.ZipFile(zip_buf, "w") as zf:
 if not st.session_state.bits_data.empty:
     zip_buf.seek(0)
     st.download_button("Download All as ZIP", data=zip_buf, file_name="bits_pngs.zip", mime="application/zip")
+
 
 
 
