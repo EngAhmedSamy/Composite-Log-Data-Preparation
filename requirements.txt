@@ -1,2 +1,7 @@
 streamlit
+pandas
 pillow
+opencv-python-headless
+pytesseract
+pdf2image
+numpy
