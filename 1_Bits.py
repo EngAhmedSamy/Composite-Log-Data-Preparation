@@ -223,5 +223,8 @@ if not st.session_state.bits_data.empty:
     zip_buf.seek(0)
     st.download_button("Download All as ZIP", data=zip_buf, file_name="bits_pngs.zip", mime="application/zip")
 
+else:
+    st.info("Add at least one Bit row above to generate PNGs")
+
 
 st.success("1-Bits tab is ready & stable!")
