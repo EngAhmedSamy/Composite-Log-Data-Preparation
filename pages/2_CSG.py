@@ -85,8 +85,8 @@ def make_csg_png(csg_type: str, depth: int, icon_bytes: bytes) -> bytes:
         f_depth = ImageFont.load_default()
 
     # Top text
-    top_text = "Liner\nHanger" if csg_type == "Liner hanger" else csg_type.replace('"', "''")
-    draw.text((w//2, 40), top_text, font=f_top, fill="black", anchor="mm", align="center")
+    #top_text = "Liner\nHanger" if csg_type == "Liner hanger" else csg_type.replace('"', "''")
+   # draw.text((w//2, 40), top_text, font=f_top, fill="black", anchor="mm", align="center")
 
     # Icon
     if icon_bytes:
