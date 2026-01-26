@@ -8,6 +8,8 @@ import cv2
 import pytesseract
 import re
 
+st.set_page_config(page_title="Petrel Data Prep", layout="wide")
+
 st.title("Petrel Composite Log Data Preparation App")
 st.markdown("### Tab 1: 1-Bits (After 30 & After 70)")
 
