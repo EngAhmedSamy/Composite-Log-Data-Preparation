@@ -25,7 +25,7 @@ for typ in csg_types:
     if typ not in st.session_state.csg_icons:
         filename = typ.replace('"', '').replace(' ', '_').replace('/', '_') + ".png"
         try:
-            with open(f"icons/{filename}", "rb") as f:
+            with open(f"assets/CSG/{filename}", "rb") as f:
                 st.session_state.csg_icons[typ] = f.read()
         except:
             pass  # icon will be missing → warning later
