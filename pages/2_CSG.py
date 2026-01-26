@@ -102,7 +102,7 @@ edited_data = st.data_editor(
     st.session_state.csg_data,
     num_rows="dynamic",
     column_config={
-        #"CSG Number": st.column_config.NumberColumn(help="Auto-assigned if blank"),
+        "CSG Number": st.column_config.NumberColumn(help="Auto-assigned if blank"),
         "Type": st.column_config.SelectboxColumn(
             options=common_types,
             help="Choose CSG type",
