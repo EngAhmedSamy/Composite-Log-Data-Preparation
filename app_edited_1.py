@@ -21,7 +21,7 @@ if 'icons' not in st.session_state:
     st.session_state.icons = {}
 
 # Load default icons from repo folder (icons/8.5.png etc.)
-common_sizes = ["8.5\"", "12.25\"", "17.5\""]
+common_sizes = ["None", 8.5\"", "12.25\"", "17.5\""]
 for size in common_sizes:
     # Only load if not already in session (prevents override loss on reruns)
     if size not in st.session_state.icons:
