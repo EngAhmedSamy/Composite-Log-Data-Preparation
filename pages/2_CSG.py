@@ -94,7 +94,7 @@ def make_csg_png(csg_type: str, depth: int, icon_bytes: bytes) -> bytes:
         icon_w = int(w * 0.78)
         icon_h = int(icon.height * icon_w / icon.width)
         icon = icon.resize((icon_w, icon_h), Image.LANCZOS)
-        img.paste(icon, ((w - icon_w) // 2, 130), icon)
+        img.paste(icon, ((w - icon_w) // 2, 100), icon)
 
     # Bottom depth
     draw.text((w//2, h - 110), f"{int(depth)}'", font=f_depth, fill="black", anchor="mm")
