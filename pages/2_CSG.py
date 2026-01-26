@@ -171,36 +171,52 @@ def generate_csg_png(csg_type, depth_in, icon_bytes):
 # Previews & Downloads
 st.subheader("Previews and Downloads")
 
-if not st.session_state.csg_data.empty:
+if 'csg_data' in st.session_state and not st.session_state.csg_data.empty:
+    df = st.session_state.csg_data.copy()
+
+    # Ensure required columns exist (defensive)
+    required = ["Type", "Depth In"]
+    for col in required:
+        if col not in df.columns:
+            df[col] = pd.NA
+
     zip_buf = io.BytesIO()
     with zipfile.ZipFile(zip_buf, "w") as zf:
-        for idx, row in st.session_state.csg_data.iterrows():
+        for idx, row in df.iterrows():
+            # Skip if critical fields missing
+            if "Type" not in row or "Depth In" not in row:
+                continue
+            if pd.isna(row["Type"]) or pd.isna(row["Depth In"]):
+                continue
+
             csg_type = row["Type"]
             depth_in = row["Depth In"]
 
-            if pd.isna(csg_type) or pd.isna(depth_in):
-                continue
-
             icon_bytes = st.session_state.csg_icons.get(csg_type)
             if not icon_bytes:
-                st.warning(f"No icon found for '{csg_type}'. Skipping.")
+                st.warning(f"No icon found for type '{csg_type}' (row {idx+1}). Skipping.")
                 continue
 
-            png_buf = generate_csg_png(csg_type, depth_in, icon_bytes)
+            try:
+                png_buf = generate_csg_png(csg_type, depth_in, icon_bytes)
+            except Exception as gen_err:
+                st.error(f"Failed to generate PNG for {csg_type} @ {depth_in}': {str(gen_err)}")
+                continue
 
             # Small preview
             st.image(png_buf.getvalue(), caption=f"{csg_type} @ {depth_in}'", width=150)
 
             d_minus = int(depth_in) - 20
             d_plus = int(depth_in) + 20
-            safe_type = csg_type.replace(" ", "_").replace('/', '_').replace('"', '')
+            safe_type = str(csg_type).replace(" ", "_").replace('/', '_').replace('"', '').replace("'", "")
             filename = f"{safe_type}.({d_minus}-{d_plus}).png"
 
             st.download_button(
                 label=f"Download {filename}",
                 data=png_buf.getvalue(),
                 file_name=filename,
-                mime="image/png"
+                mime="image/png",
+                key=f"dl_{idx}"   # unique key to avoid duplicate widget error
             )
 
             zf.writestr(filename, png_buf.getvalue())
@@ -210,7 +226,8 @@ if not st.session_state.csg_data.empty:
         "Download All as ZIP",
         data=zip_buf,
         file_name="csg_pngs.zip",
-        mime="application/zip"
+        mime="application/zip",
+        key="zip_all"
     )
 else:
-    st.info("Add at least one CSG entry to generate previews/downloads.")
+    st.info("Add at least one valid CSG entry (Type + Depth In) to see previews and downloads.")
