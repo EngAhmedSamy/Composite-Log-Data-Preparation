@@ -1,9 +1,3 @@
-# Cell 1: Install dependencies
-!pip install -q streamlit pyngrok pillow opencv-python-headless pytesseract pdf2image
-!apt-get install -y tesseract-ocr poppler-utils
-
-# Cell 2: Write the Streamlit app code to app.py
-%%writefile app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -49,21 +43,20 @@ if mud_log:
         # OCR
         text = pytesseract.image_to_string(thresh)
         
-        # Parse text into data (assuming table structure)
+        # Parse text into data (assuming table structure from your example)
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         parsed_bits = []
-        for line in lines[2:]:  # Skip header and title
+        for line in lines:
             parts = re.split(r'\s+', line)
             if len(parts) >= 7:
-                bit_no = parts[0]
-                size = parts[4]  # e.g., 17.5"
-                depth_in = parts[6]  # e.g., 92
                 try:
-                    bit_no = int(bit_no)
-                    depth_in = int(depth_in)
+                    bit_no = int(parts[0])          # e.g. 1, 2, 3
+                    size = parts[4]                 # e.g. 17.5"
+                    depth_in = int(parts[6])        # e.g. 92
                     parsed_bits.append({"Bit Number": bit_no, "Size": size, "Depth In": depth_in})
-                except ValueError:
+                except (ValueError, IndexError):
                     pass
+        
         if parsed_bits:
             new_df = pd.DataFrame(parsed_bits)
             st.session_state.bits_data = pd.concat([st.session_state.bits_data, new_df]).drop_duplicates().reset_index(drop=True)
@@ -89,12 +82,11 @@ st.session_state.bits_data = edited_data
 
 # Function to generate PNG
 def generate_bit_png(bit_no, size, depth_in, icon_bytes):
-    # Create blank image
     width, height = 299, 598
     image = Image.new('RGBA', (width, height), (255, 255, 255, 255))
     draw = ImageDraw.Draw(image)
     
-    # Fonts (use system font in Colab)
+    # Fonts (DejaVuSerif is usually available on Streamlit Cloud)
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
         top_font = ImageFont.truetype(font_path, 40)
@@ -103,28 +95,25 @@ def generate_bit_png(bit_no, size, depth_in, icon_bytes):
         top_font = ImageFont.load_default()
         bottom_font = ImageFont.load_default()
     
-    # Top text: BIT #<no>, <size>'
+    # Top text
     top_text = f"BIT #{bit_no}, {size}'"
-    bbox = draw.textbbox((0,0), top_text, font=top_font)
+    bbox = draw.textbbox((0, 0), top_text, font=top_font)
     text_width = bbox[2] - bbox[0]
     draw.text(((width - text_width) / 2, 20), top_text, fill="black", font=top_font)
     
-    # Bottom text: <depth_in>'
+    # Bottom text
     bottom_text = f"{depth_in}'"
-    bbox = draw.textbbox((0,0), bottom_text, font=bottom_font)
+    bbox = draw.textbbox((0, 0), bottom_text, font=bottom_font)
     text_width = bbox[2] - bbox[0]
     draw.text(((width - text_width) / 2, height - 100), bottom_text, fill="black", font=bottom_font)
     
-    # Icon: Resize and paste in middle
+    # Paste icon
     if icon_bytes:
         icon = Image.open(io.BytesIO(icon_bytes))
-        icon = icon.resize((200, 200), Image.ANTIALIAS)
+        icon = icon.resize((200, 200), Image.LANCZOS)
         image.paste(icon, ((width - 200) // 2, (height - 200) // 2), icon if icon.mode == 'RGBA' else None)
     
-    # Set DPI
     image.info['dpi'] = (150, 150)
-    
-    # Save to bytes
     buf = io.BytesIO()
     image.save(buf, format="PNG", dpi=(150, 150))
     buf.seek(0)
@@ -144,26 +133,22 @@ with zipfile.ZipFile(zip_buf, "w") as zf:
         
         icon_bytes = st.session_state.icons.get(size, None)
         if not icon_bytes:
-            st.warning(f"No icon uploaded for size {size}. Skipping preview/download for Bit {bit_no}.")
+            st.warning(f"No icon for size {size}. Skipping Bit {bit_no}.")
             continue
         
-        png_buf = generate_bit_png(bit_no, size.replace('"', ''), int(depth_in), icon_bytes)  # Remove " for text
+        png_buf = generate_bit_png(int(bit_no), size.replace('"', ''), int(depth_in), icon_bytes)
         
-        # Preview
-        st.image(png_buf.getvalue(), caption=f"Preview: Bit {bit_no}", width=150)
+        # Preview (small)
+        st.image(png_buf.getvalue(), caption=f"Bit {bit_no}", width=150)
         
-        # Filename
         d30 = int(depth_in) + 30
         d70 = int(depth_in) + 70
         filename = f"Bit {bit_no}. ({d30} - {d70}).png"
         
-        # Individual download
-        st.download_button(f"Download {filename}", data=png_buf.getvalue(), file_name=filename)
+        st.download_button(f"Download {filename}", data=png_buf.getvalue(), file_name=filename, mime="image/png")
         
-        # Add to ZIP
         zf.writestr(filename, png_buf.getvalue())
 
 if not st.session_state.bits_data.empty:
     zip_buf.seek(0)
-    st.download_button("Download All as ZIP", data=zip_buf, file_name="bits_pngs.zip")
-
+    st.download_button("Download All as ZIP", data=zip_buf, file_name="bits_pngs.zip", mime="application/zip")
