@@ -18,7 +18,7 @@ if 'bits_data' not in st.session_state:
 # Icons dictionary (size to uploaded file bytes)
 if 'icons' not in st.session_state:
     st.session_state.icons = {}
-ss
+
 # Section: Upload icons for common sizes
 with st.expander("Upload Bit Icons (per size)"):
     common_sizes = ["17.5\"", "12.25\"", "8.5\""]
@@ -188,4 +188,5 @@ with zipfile.ZipFile(zip_buf, "w") as zf:
 if not st.session_state.bits_data.empty:
     zip_buf.seek(0)
     st.download_button("Download All as ZIP", data=zip_buf, file_name="bits_pngs.zip", mime="application/zip")
+
 
