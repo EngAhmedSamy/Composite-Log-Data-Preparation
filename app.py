@@ -116,10 +116,10 @@ def generate_bit_png(bit_no, size, depth_in, icon_bytes):
     draw.text((x_size, y_size), size_text, fill="black", font=size_font)
     
     # Underline - a bit longer than the text
-    underline_y = y_size + 50
-    underline_start = x_size - 8
-    underline_end = x_size + size_w + 8
-    draw.line([(underline_start, underline_y), (underline_end, underline_y)], fill="black", width=4)
+    #underline_y = y_size + 50
+    #underline_start = x_size - 8
+    #underline_end = x_size + size_w + 8
+    #draw.line([(underline_start, underline_y), (underline_end, underline_y)], fill="black", width=4)
 
     # ── Bit icon ────────────────────────────────────────────────────────
     icon_y_start = 140          # starts quite high
@@ -188,5 +188,6 @@ with zipfile.ZipFile(zip_buf, "w") as zf:
 if not st.session_state.bits_data.empty:
     zip_buf.seek(0)
     st.download_button("Download All as ZIP", data=zip_buf, file_name="bits_pngs.zip", mime="application/zip")
+
 
 
