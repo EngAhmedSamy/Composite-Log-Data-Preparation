@@ -10,11 +10,11 @@ import re
 
 st.title("2-CSG (Before 20 & After 20)")
 
-# Session state for data
+# Session state for data — only Type and Depth In
 if 'csg_data' not in st.session_state:
-    st.session_state.csg_data = pd.DataFrame(columns=[ "CSG Type ", "Depth In"])
+    st.session_state.csg_data = pd.DataFrame(columns=["Type", "Depth In"])
 
-# Icons dictionary (type to bytes)
+# Icons dictionary (type → bytes)
 if 'csg_icons' not in st.session_state:
     st.session_state.csg_icons = {}
 
@@ -22,9 +22,9 @@ if 'csg_icons' not in st.session_state:
 common_types = ["20\" Cond.", "13 3/8\"", "9 5/8\"", "7\" Liner", "Liner hanger", "PBTD"]
 for csg_type in common_types:
     if csg_type not in st.session_state.csg_icons:
-        file_name = csg_type.replace(" ", "_").replace('"', '').replace('/', '_') + '.png'  # e.g., 13_3_8.png
+        file_name = csg_type.replace(" ", "_").replace('"', '').replace('/', '_') + '.png'
         try:
-            with open(f"assets/CSG/{file_name}", "rb") as f:
+            with open(f"icons/{file_name}", "rb") as f:
                 st.session_state.csg_icons[csg_type] = f.read()
             if 'csg_icons_loaded' not in st.session_state:
                 st.session_state.csg_icons_loaded = True
@@ -38,7 +38,7 @@ with st.expander("Override / Replace Default Icons (optional)"):
         uploaded = st.file_uploader(
             f"Replace icon for {csg_type}",
             type=["png", "jpg", "jpeg"],
-            key=f"override_csg_{csg_type.replace(' ', '_')}"
+            key=f"override_csg_{csg_type.replace(' ', '_').replace('/', '_')}"
         )
         if uploaded:
             st.session_state.csg_icons[csg_type] = uploaded.getvalue()
@@ -60,7 +60,6 @@ if mud_log:
             img_array = np.frombuffer(file_bytes, np.uint8)
             images = [cv2.imdecode(img_array, cv2.IMREAD_COLOR)]
 
-        # OCR on each page
         text = ''
         for img in images:
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -79,52 +78,48 @@ if mud_log:
                 parts = re.split(r'\s+', line)
                 if len(parts) >= 4:
                     try:
-                        csg_type = parts[2]  # CASING SIZE, e.g., 20", 13 3/8"
-                        # Map to common_types if close match
-                        csg_type = next((t for t in common_types if csg_type in t), csg_type)
-                        depth_in = int(parts[3])  # SHOE DEPTH
-                        parsed_csg.append({"Type": csg_type, "Depth In": depth_in})
+                        csg_type_raw = parts[2]  # CASING SIZE
+                        # Try to match to one of our common types
+                        csg_type = next((t for t in common_types if csg_type_raw in t or t in csg_type_raw), None)
+                        if csg_type:
+                            depth_in = int(parts[3])  # SHOE DEPTH (FT.)
+                            parsed_csg.append({"Type": csg_type, "Depth In": depth_in})
                     except (ValueError, IndexError):
                         pass
 
         if parsed_csg:
             new_df = pd.DataFrame(parsed_csg)
+            # Append only new unique combinations to avoid duplicates
             st.session_state.csg_data = pd.concat([st.session_state.csg_data, new_df]).drop_duplicates().reset_index(drop=True)
-            st.success(f"Extracted {len(parsed_csg)} CSGs from mud log!")
+            st.success(f"Extracted {len(parsed_csg)} CSG entries!")
         else:
-            st.warning("No CSG data extracted. Check file or enter manually.")
+            st.warning("No matching CSG data found in the file. Try manual entry.")
     except Exception as e:
-        st.error(f"Processing error: {e}")
+        st.error(f"Error processing file: {str(e)}")
 
-# Data editor
+# Data editor — only Type and Depth In
 st.subheader("CSG Data (Edit/Add Rows)")
 edited_data = st.data_editor(
     st.session_state.csg_data,
     num_rows="dynamic",
     column_config={
-        "CSG Number": st.column_config.NumberColumn(help="Auto-assigned if blank"),
         "Type": st.column_config.SelectboxColumn(
             options=common_types,
-            help="Choose CSG type",
+            help="Select CSG / Liner type",
             required=True
         ),
-        "Depth In": st.column_config.NumberColumn(help="Depth in (integer)")
+        "Depth In": st.column_config.NumberColumn(
+            help="Shoe depth / setting depth (ft)",
+            required=True
+        )
     },
-    use_container_width=True
+    use_container_width=True,
+    hide_index=False   # shows row numbers but not as "CSG Number"
 )
-
-# Auto-assign CSG Number
-if not edited_data.empty:
-    max_csg = edited_data['CSG Number'].max() if 'CSG Number' in edited_data.columns else 0
-    if pd.isna(max_csg):
-        max_csg = 0
-    for idx in edited_data[pd.isna(edited_data['CSG Number'])].index:
-        max_csg += 1
-        edited_data.at[idx, 'CSG Number'] = max_csg
 
 st.session_state.csg_data = edited_data
 
-# Function to generate PNG
+# PNG generation function
 def generate_csg_png(csg_type, depth_in, icon_bytes):
     width, height = 354, 592
     image = Image.new('RGBA', (width, height), (255, 255, 255, 255))
@@ -138,36 +133,33 @@ def generate_csg_png(csg_type, depth_in, icon_bytes):
         top_font = ImageFont.load_default()
         depth_font = ImageFont.load_default()
 
-    # Top text: Special for Liner hanger or regular type
+    # Top text
     if csg_type == "Liner hanger":
-        top_text = "Liner Hanger"
-        bbox = draw.textbbox((0, 0), top_text, font=top_font)
-        text_w = bbox[2] - bbox[0]
-        draw.text(((width - text_w) / 2, 20), top_text, fill="black", font=top_font)
+        top_text = "Liner\nHanger"
     else:
-        top_text = csg_type.replace('"', "''")  # e.g., 7''
-        bbox = draw.textbbox((0, 0), top_text, font=top_font)
-        text_w = bbox[2] - bbox[0]
-        draw.text(((width - text_w) / 2, 20), top_text, fill="black", font=top_font)
+        top_text = csg_type.replace('"', "''")
+    bbox = draw.textbbox((0, 0), top_text, font=top_font)
+    text_w = bbox[2] - bbox[0]
+    draw.text(((width - text_w) / 2, 30), top_text, fill="black", font=top_font, align="center")
 
-    # Icon: Resize and paste centered
-    icon_y = 100  # Adjust based on examples
+    # Icon
+    icon_y = 120
     if icon_bytes:
         icon = Image.open(io.BytesIO(icon_bytes))
-        target_width = int(width * 0.8)
-        aspect = icon.height / icon.width
+        target_width = int(width * 0.75)
+        aspect = icon.height / icon.width if icon.width > 0 else 1
         target_height = int(target_width * aspect)
         icon = icon.resize((target_width, target_height), Image.LANCZOS)
         icon_x = (width - target_width) // 2
         image.paste(icon, (icon_x, icon_y), icon if icon.mode == 'RGBA' else None)
 
     # Bottom depth
-    bottom_text = f"{depth_in}'"
+    bottom_text = f"{int(depth_in)}'"
     bbox = draw.textbbox((0, 0), bottom_text, font=depth_font)
     text_w = bbox[2] - bbox[0]
-    draw.text(((width - text_w) / 2, height - 100), bottom_text, fill="black", font=depth_font)
+    draw.text(((width - text_w) / 2, height - 120), bottom_text, fill="black", font=depth_font)
 
-    # Convert to 8-bit (palette mode for grayscale)
+    # To 8-bit palette mode
     image = image.convert('P', palette=Image.ADAPTIVE, colors=256)
     image.info['dpi'] = (150, 150)
 
@@ -176,35 +168,49 @@ def generate_csg_png(csg_type, depth_in, icon_bytes):
     buf.seek(0)
     return buf
 
-# Previews and Downloads
+# Previews & Downloads
 st.subheader("Previews and Downloads")
-zip_buf = io.BytesIO()
-with zipfile.ZipFile(zip_buf, "w") as zf:
-    for idx, row in st.session_state.csg_data.iterrows():
-        csg_no = row.get("CSG Number", "")
-        csg_type = row["Type"]
-        depth_in = row["Depth In"]
-
-        if pd.isna(csg_type) or pd.isna(depth_in):
-            continue
-
-        icon_bytes = st.session_state.csg_icons.get(csg_type, None)
-        if not icon_bytes:
-            st.warning(f"No icon for type {csg_type}. Skipping.")
-            continue
-
-        png_buf = generate_csg_png(csg_type, int(depth_in), icon_bytes)
-
-        st.image(png_buf.getvalue(), caption=f"{csg_type} (Preview)", width=150)
-
-        d_minus_20 = int(depth_in) - 20
-        d_plus_20 = int(depth_in) + 20
-        filename = f"{csg_type.replace(' ', '_').replace('/', '_')}. ({d_minus_20} - {d_plus_20}).png"
-
-        st.download_button(f"Download {filename}", data=png_buf.getvalue(), file_name=filename, mime="image/png")
-
-        zf.writestr(filename, png_buf.getvalue())
 
 if not st.session_state.csg_data.empty:
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w") as zf:
+        for idx, row in st.session_state.csg_data.iterrows():
+            csg_type = row["Type"]
+            depth_in = row["Depth In"]
+
+            if pd.isna(csg_type) or pd.isna(depth_in):
+                continue
+
+            icon_bytes = st.session_state.csg_icons.get(csg_type)
+            if not icon_bytes:
+                st.warning(f"No icon found for '{csg_type}'. Skipping.")
+                continue
+
+            png_buf = generate_csg_png(csg_type, depth_in, icon_bytes)
+
+            # Small preview
+            st.image(png_buf.getvalue(), caption=f"{csg_type} @ {depth_in}'", width=150)
+
+            d_minus = int(depth_in) - 20
+            d_plus = int(depth_in) + 20
+            safe_type = csg_type.replace(" ", "_").replace('/', '_').replace('"', '')
+            filename = f"{safe_type}.({d_minus}-{d_plus}).png"
+
+            st.download_button(
+                label=f"Download {filename}",
+                data=png_buf.getvalue(),
+                file_name=filename,
+                mime="image/png"
+            )
+
+            zf.writestr(filename, png_buf.getvalue())
+
     zip_buf.seek(0)
-    st.download_button("Download All as ZIP", data=zip_buf, file_name="csg_pngs.zip", mime="application/zip")
+    st.download_button(
+        "Download All as ZIP",
+        data=zip_buf,
+        file_name="csg_pngs.zip",
+        mime="application/zip"
+    )
+else:
+    st.info("Add at least one CSG entry to generate previews/downloads.")
