@@ -1,12 +1,11 @@
 import streamlit as st
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import io
 from zipfile import ZipFile
 import os
 
 # ---------------- CONFIG ----------------
 st.set_page_config(page_title="Composite Log Data Preparation", layout="wide")
-
 st.title("Composite Log Data Preparation")
 st.subheader("1 – Bits (After 30 & After 70)")
 
@@ -15,11 +14,19 @@ if "bits" not in st.session_state:
     st.session_state.bits = []
 
 # ---------------- PATHS ----------------
-BASE_DIR = os.path.dirname(__file__)
-BIT_ICON_PATHS = {
-    '17.5"': os.path.join(BASE_DIR, "assets/bits/bit_17_5.png"),
-    '12.25"': os.path.join(BASE_DIR, "assets/bits/bit_12_25.png"),
-    '8.5"': os.path.join(BASE_DIR, "assets/bits/bit_8_5.png"),
+BASE = os.path.dirname(__file__)
+ASSETS = os.path.join(BASE, "assets", "bits")
+
+TEMPLATES = {
+    '17.5"': os.path.join(ASSETS, "template_17_5.png"),
+    '12.25"': os.path.join(ASSETS, "template_12_25.png"),
+    '8.5"': os.path.join(ASSETS, "template_8_5.png"),
+}
+
+SHAPES = {
+    '17.5"': os.path.join(ASSETS, "shape_17_5.png"),
+    '12.25"': os.path.join(ASSETS, "shape_12_25.png"),
+    '8.5"': os.path.join(ASSETS, "shape_8_5.png"),
 }
 
 # ---------------- LAYOUT ----------------
@@ -27,51 +34,50 @@ left, right = st.columns([1, 2])
 
 # ---------------- INPUT ----------------
 with left:
-    st.markdown("### Bit Input")
-
     bit_no = st.number_input("Bit Number", min_value=1, step=1)
     bit_size = st.selectbox("Bit Size", ['17.5"', '12.25"', '8.5"'])
     depth_in = st.number_input("Depth In (ft)", min_value=0, step=1)
 
     if st.button("➕ Add Bit"):
         st.session_state.bits.append({
-            "bit_no": bit_no,
-            "bit_size": bit_size,
+            "no": bit_no,
+            "size": bit_size,
             "depth": depth_in
         })
         st.success(f"Bit #{bit_no} added")
 
 # ---------------- IMAGE GENERATOR ----------------
 def generate_bit_png(bit):
-    template = Image.open(TEMPLATE_PATH).convert("RGBA")
-    draw = ImageDraw.Draw(template)
+    img = Image.open(TEMPLATES[bit["size"]]).convert("RGBA")
+    draw = ImageDraw.Draw(img)
 
-    # Clear text areas only
-    draw.rectangle(TEXT_ZONE_1, fill="white")
-    draw.rectangle(TEXT_ZONE_2, fill="white")
-    draw.rectangle(TEXT_ZONE_3, fill="white")
+    # Clear old text areas
+    draw.rectangle((40, 20, 260, 90), fill="white")
+    draw.rectangle((40, 90, 260, 160), fill="white")
+    draw.rectangle((40, 480, 260, 560), fill="white")
+
+    font = ImageFont.load_default()
 
     # Write new text
-    draw.text(BIT_NO_POS, f"BIT # {bit_no},", fill="black", font=font)
-    draw.text(SIZE_POS, bit_size, fill="black", font=font)
-    draw.text(DEPTH_POS, f"{depth}`", fill="black", font=font)
+    draw.text((70, 35), f"BIT # {bit['no']},", fill="black", font=font)
+    draw.text((95, 105), bit["size"], fill="black", font=font)
+    draw.text((100, 500), f"{bit['depth']}`", fill="black", font=font)
 
-    # Paste PRE-CROPPED shape
-    shape = Image.open(SHAPE_PATH).convert("RGBA")
-    template.paste(shape, SHAPE_WINDOW_POS, shape)
+    # Replace ONLY bit shape
+    shape = Image.open(SHAPES[bit["size"]]).convert("RGBA")
+    img.paste(shape, (40, 170), shape)
 
-    return template
-
+    return img
 
 # ---------------- PREVIEW ----------------
 with right:
     st.markdown("### Preview")
-
     previews = []
+
     for bit in st.session_state.bits:
-        img = generate_bit_png(bit)
-        st.image(img, width=200, caption=f"Bit #{bit['bit_no']}")
-        previews.append(img)
+        out = generate_bit_png(bit)
+        st.image(out, width=200)
+        previews.append(out)
 
 # ---------------- SAVE ----------------
 if st.session_state.bits:
@@ -82,7 +88,7 @@ if st.session_state.bits:
 
     for i, bit in enumerate(st.session_state.bits):
         checked = st.checkbox(
-            f"Bit #{bit['bit_no']} ({bit['depth']+30}-{bit['depth']+70})",
+            f"Bit #{bit['no']} ({bit['depth']+30}-{bit['depth']+70})",
             value=select_all,
             key=f"chk_{i}"
         )
@@ -91,14 +97,14 @@ if st.session_state.bits:
     if st.button("💾 Save Selected"):
         zip_buffer = io.BytesIO()
 
-        with ZipFile(zip_buffer, "w") as zip_file:
+        with ZipFile(zip_buffer, "w") as zipf:
             for i, bit in enumerate(st.session_state.bits):
                 if selected[i]:
                     img = generate_bit_png(bit)
-                    name = f"Bit {bit['bit_no']} ({bit['depth']+30}-{bit['depth']+70}).png"
-                    img_bytes = io.BytesIO()
-                    img.save(img_bytes, format="PNG")
-                    zip_file.writestr(name, img_bytes.getvalue())
+                    name = f"Bit {bit['no']} ({bit['depth']+30}-{bit['depth']+70}).png"
+                    buf = io.BytesIO()
+                    img.save(buf, format="PNG")
+                    zipf.writestr(name, buf.getvalue())
 
         st.download_button(
             "Download ZIP",
@@ -106,5 +112,3 @@ if st.session_state.bits:
             file_name="Bits_Petrel_Output.zip",
             mime="application/zip"
         )
-
-
