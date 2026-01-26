@@ -42,20 +42,41 @@ with left:
         st.success(f"Bit #{bit_no} added")
 
 # ---------------- IMAGE GENERATOR ----------------
+from PIL import Image, ImageDraw, ImageFont
+
 def generate_bit_png(bit):
-    canvas = Image.new("RGB", (299, 598), "white")
-    draw = ImageDraw.Draw(canvas)
+    # Load correct template
+    template_path = f"assets/bits/template_{bit['bit_size'].replace('.', '_').replace('\"','')}.png"
+    shape_path = f"assets/bits/shape_{bit['bit_size'].replace('.', '_').replace('\"','')}.png"
 
-    icon = Image.open(BIT_ICON_PATHS[bit["bit_size"]]).convert("RGBA")
-    icon.thumbnail((220, 220))
+    img = Image.open(template_path).convert("RGBA")
+    draw = ImageDraw.Draw(img)
 
-    draw.text((60, 20), f"BIT # {bit['bit_no']}", fill="black")
-    draw.text((90, 70), bit["bit_size"], fill="black")
+    # Define exact overwrite boxes (YOU CAN FINE-TUNE PIXELS)
+    BIT_NO_POS = (80, 40)
+    SIZE_POS   = (100, 120)
+    DEPTH_POS  = (100, 480)
+    SHAPE_POS  = (40, 200)
 
-    canvas.paste(icon, ((299 - icon.width)//2, 140), icon)
-    draw.text((110, 500), f"{bit['depth']}`", fill="black")
+    # White-out old text areas
+    draw.rectangle([60, 30, 240, 90], fill="white")     # Bit No
+    draw.rectangle([60, 100, 240, 160], fill="white")  # Size
+    draw.rectangle([60, 470, 240, 540], fill="white")  # Depth
 
-    return canvas
+    # Use default font (matches template visually better than redrawing layout)
+    font = ImageFont.load_default()
+
+    # Write new values
+    draw.text(BIT_NO_POS, f"BIT # {bit['bit_no']},", fill="black", font=font)
+    draw.text(SIZE_POS, bit["bit_size"], fill="black", font=font)
+    draw.text(DEPTH_POS, f"{bit['depth']}`", fill="black", font=font)
+
+    # Replace ONLY bit shape
+    shape = Image.open(shape_path).convert("RGBA")
+    img.paste(shape, SHAPE_POS, shape)
+
+    return img
+
 
 # ---------------- PREVIEW ----------------
 with right:
@@ -100,3 +121,4 @@ if st.session_state.bits:
             file_name="Bits_Petrel_Output.zip",
             mime="application/zip"
         )
+
