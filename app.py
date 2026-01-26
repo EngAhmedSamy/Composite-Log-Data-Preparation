@@ -18,7 +18,7 @@ if 'bits_data' not in st.session_state:
 # Icons dictionary (size to uploaded file bytes)
 if 'icons' not in st.session_state:
     st.session_state.icons = {}
-
+ss
 # Section: Upload icons for common sizes
 with st.expander("Upload Bit Icons (per size)"):
     common_sizes = ["17.5\"", "12.25\"", "8.5\""]
@@ -86,34 +86,70 @@ def generate_bit_png(bit_no, size, depth_in, icon_bytes):
     image = Image.new('RGBA', (width, height), (255, 255, 255, 255))
     draw = ImageDraw.Draw(image)
     
-    # Fonts (DejaVuSerif is usually available on Streamlit Cloud)
+    # Try to use a bold serif font - DejaVuSerif-Bold is usually good enough
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
-        top_font = ImageFont.truetype(font_path, 40)
-        bottom_font = ImageFont.truetype(font_path, 60)
+        big_font = ImageFont.truetype(font_path, 52)      # BIT # & number
+        size_font = ImageFont.truetype(font_path, 46)     # size with underline
+        depth_font = ImageFont.truetype(font_path, 72)    # bottom depth
     except:
-        top_font = ImageFont.load_default()
-        bottom_font = ImageFont.load_default()
+        # Fallback - will be smaller & thinner
+        big_font = ImageFont.load_default()
+        size_font = ImageFont.load_default()
+        depth_font = ImageFont.load_default()
+
+    # ── Top text: "BIT #1," ─────────────────────────────────────────────
+    top_text = f"BIT #{bit_no},"
+    bbox = draw.textbbox((0, 0), top_text, font=big_font)
+    text_w = bbox[2] - bbox[0]
+    x = (width - text_w) // 2
+    y_top = 25
+    draw.text((x, y_top), top_text, fill="black", font=big_font)
+
+    # ── Size line with underline ────────────────────────────────────────
+    size_text = f"{size}''"
+    bbox_size = draw.textbbox((0, 0), size_text, font=size_font)
+    size_w = bbox_size[2] - bbox_size[0]
+    x_size = (width - size_w) // 2
+    y_size = y_top + 65   # below the BIT line
     
-    # Top text
-    top_text = f"BIT #{bit_no}, {size}'"
-    bbox = draw.textbbox((0, 0), top_text, font=top_font)
-    text_width = bbox[2] - bbox[0]
-    draw.text(((width - text_width) / 2, 20), top_text, fill="black", font=top_font)
+    draw.text((x_size, y_size), size_text, fill="black", font=size_font)
     
-    # Bottom text
-    bottom_text = f"{depth_in}'"
-    bbox = draw.textbbox((0, 0), bottom_text, font=bottom_font)
-    text_width = bbox[2] - bbox[0]
-    draw.text(((width - text_width) / 2, height - 100), bottom_text, fill="black", font=bottom_font)
-    
-    # Paste icon
+    # Underline - a bit longer than the text
+    underline_y = y_size + 50
+    underline_start = x_size - 8
+    underline_end = x_size + size_w + 8
+    draw.line([(underline_start, underline_y), (underline_end, underline_y)], fill="black", width=4)
+
+    # ── Bit icon ────────────────────────────────────────────────────────
+    icon_y_start = 140          # starts quite high
     if icon_bytes:
         icon = Image.open(io.BytesIO(icon_bytes))
-        icon = icon.resize((200, 200), Image.LANCZOS)
-        image.paste(icon, ((width - 200) // 2, (height - 200) // 2), icon if icon.mode == 'RGBA' else None)
+        
+        # Make icon quite large - about 80-85% of width
+        target_width = int(width * 0.82)
+        aspect = icon.height / icon.width
+        target_height = int(target_width * aspect)
+        
+        icon = icon.resize((target_width, target_height), Image.LANCZOS)
+        
+        # Center horizontally, place vertically after size text
+        icon_x = (width - target_width) // 2
+        image.paste(icon, (icon_x, icon_y_start), icon if icon.mode == 'RGBA' else None)
+
+    # ── Bottom depth ────────────────────────────────────────────────────
+    depth_text = f"{depth_in}'"
+    bbox_depth = draw.textbbox((0, 0), depth_text, font=depth_font)
+    depth_w = bbox_depth[2] - bbox_depth[0]
+    x_depth = (width - depth_w) // 2
     
+    # Place very low - adjust this value if needed (closer to bottom)
+    y_depth = height - 110
+    draw.text((x_depth, y_depth), depth_text, fill="black", font=depth_font)
+
+    # Set DPI metadata
     image.info['dpi'] = (150, 150)
+    
     buf = io.BytesIO()
     image.save(buf, format="PNG", dpi=(150, 150))
     buf.seek(0)
@@ -152,3 +188,4 @@ with zipfile.ZipFile(zip_buf, "w") as zf:
 if not st.session_state.bits_data.empty:
     zip_buf.seek(0)
     st.download_button("Download All as ZIP", data=zip_buf, file_name="bits_pngs.zip", mime="application/zip")
+
