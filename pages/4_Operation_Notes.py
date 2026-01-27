@@ -25,59 +25,59 @@ st.subheader("Data Entry Options")
 
 tab1, tab2 = st.tabs(["1. Upload Mud Log PDF", "2. Upload Excel Sheet"])
 
-with tab1:
+wwith tab1:
     pdf_file = st.file_uploader("Upload Mud Log PDF", type=["pdf"])
     if pdf_file:
         try:
-            # Convert PDF to images
             images = convert_from_bytes(pdf_file.read())
-
-            extracted = []
+            all_text = ""
             well_name = None
 
-            for page in images:
-                # OCR the page
-                text = pytesseract.image_to_string(page)
+            for idx, pil_img in enumerate(images):
+                # Optional: save for debug
+                # pil_img.save(f"page_{idx}.png")
 
-                # Find well name (assume from first page, e.g., line containing "Well:")
-                if not well_name:
-                    match = re.search(r'Well:\s*(\S+)', text)
-                    if match:
-                        well_name = match.group(1)
+                # OCR with data (bounding boxes)
+                data = pytesseract.image_to_data(pil_img, output_type=pytesseract.Output.DICT)
 
-                # Find LITHOLOGY DESCRIPTIONS AND REMARKS section
-                lines = text.splitlines()
-                in_section = False
-                for line in lines:
-                    if "LITHOLOGY DESCRIPTIONS AND REMARKS" in line.upper():
-                        in_section = True
-                    elif in_section:
-                        # Skip black lithology (starts with LST, SH, etc.)
-                        if re.match(r'^(LST|SH|SST|SD|CLY|GY|MARL|ANH|SLT|DL|LS|MD|PK|WD|GLC|HAL|PYR|QZ|FLD|BAS|GRN|VOL|IGN|MET|UNK)\b', line.upper(), re.I):
-                            continue
-                        # Extract other lines (assumed colored or boxed)
-                        # Simple heuristic: lines not starting with lith codes
-                        # For better color detection, use CV
-                        if line.strip():
-                            # Assume depth + note format, e.g., "Sh. Dk gy, gy. It gy v blk y-sb."
-                            extracted.append({"Notes": line.strip()})
+                n_boxes = len(data['level'])
+                for i in range(n_boxes):
+                    text = data['text'][i].strip()
+                    if not text:
+                        continue
 
-            # Basic depth assignment (you may need to improve parsing)
-            # Assume depths from context or add manually
+                    # Detect well name
+                    if not well_name and "Well" in text:
+                        well_name = text.split("Well")[-1].strip().split()[0]
+
+                    # Collect potential depth lines (e.g., numbers like 1700, 4185)
+                    if re.match(r'^\d{3,5}$', text):  # simple depth pattern
+                        depth = int(text)
+                        # Look for notes nearby (next lines or same block)
+                        # This is basic — improve with y-coordinate grouping later
+                        note_candidates = []
+                        for j in range(i+1, min(i+10, n_boxes)):
+                            note_text = data['text'][j].strip()
+                            if note_text and not re.match(r'^(LST|SH|SST|SD|CLY|GY|MARL|ANH|SLT|DL|LS|MD|PK|WD|GLC|HAL|PYR|QZ|FLD|BAS|GRN|VOL|IGN|MET|UNK)\b', note_text.upper()):
+                                note_candidates.append(note_text)
+
+                        if note_candidates:
+                            combined_note = " ".join(note_candidates)
+                            extracted.append({"Depth1": depth, "Notes": combined_note})
+
             if extracted:
                 df = pd.DataFrame(extracted)
-                df["Depth1"] = range(0, len(df) * 10, 10)  # Placeholder depths
-                df["Depth2"] = df["Depth1"] + 10
-                st.session_state.op_notes_data = pd.concat([st.session_state.op_notes_data, df[["Depth1", "Depth2", "Notes"]]])
+                df["Depth2"] = df["Depth1"] + 15  # After 15 rule
+                st.session_state.op_notes_data = pd.concat([st.session_state.op_notes_data, df[["Depth1", "Depth2", "Notes"]]], ignore_index=True)
                 if well_name:
                     st.session_state.well_name = well_name
-                st.success("Extracted notes from PDF")
+                st.success(f"Extracted {len(extracted)} operation notes with depths")
             else:
-                st.warning("No operation notes found in PDF")
+                st.warning("No colored/boxed operation notes detected. Try manual edit or Excel upload.")
 
         except Exception as e:
-            st.error(f"Error processing PDF: {e}")
-
+            st.error(f"Error processing PDF: {str(e)}")
+            
 with tab2:
     excel_file = st.file_uploader("Upload Excel Sheet", type=["xlsx", "xls"])
     if excel_file:
