@@ -206,7 +206,7 @@ def generate_bit_png(bit_no, size, depth_in, icon_bytes):
     #underline_y = y_size + 48
     #draw.line([(x_size - 10, underline_y), (x_size + size_w + 10, underline_y)], fill="black", width=5)
 
-    # Icon
+        # Icon
     if icon_bytes:
         icon = Image.open(io.BytesIO(icon_bytes))
         target_w = int(width * 0.82)
@@ -214,7 +214,13 @@ def generate_bit_png(bit_no, size, depth_in, icon_bytes):
         target_h = int(target_w * aspect)
         icon = icon.resize((target_w, target_h), Image.LANCZOS)
         icon_x = (width - target_w) // 2
-        icon_y = 200   # ← you can adjust this number higher/lower
+        
+        icon_y = 200   # ← you can adjust this number higher/lower # default position for all bits
+        
+        # Special adjustment only for 17.5" bit
+        if size == "17.5\"":
+            icon_y = 190   # ← ← ← CHANGE THIS VALUE to control height for 17.5" only
+        
         image.paste(icon, (icon_x, icon_y), icon if icon.mode == 'RGBA' else None)
 
     # Bottom depth
