@@ -189,8 +189,8 @@ def generate_csg_png(csg_type, depth, icon_bytes):
         font_big = font_depth = ImageFont.load_default()
 
     # Title
-    title = "Liner\nHanger" if csg_type == "Liner hanger" else csg_type.replace('"', "''")
-    draw.text((w//2, 45), title, font=font_big, fill="black", anchor="mm", align="center")
+   # title = "Liner\nHanger" if csg_type == "Liner hanger" else csg_type.replace('"', "''")
+    #draw.text((w//2, 45), title, font=font_big, fill="black", anchor="mm", align="center")
 
     # Icon
     if icon_bytes:
@@ -198,7 +198,7 @@ def generate_csg_png(csg_type, depth, icon_bytes):
         iw = int(w * 0.78)
         ih = int(icon.height * iw / icon.width)
         icon = icon.resize((iw, ih), Image.LANCZOS)
-        img.paste(icon, ((w - iw)//2, 95), icon)
+        img.paste(icon, ((w - iw)//2, 0), icon)
 
     # Depth
     draw.text((w//2, h - 100), f"{int(depth)}'", font=font_depth, fill="black", anchor="mm")
