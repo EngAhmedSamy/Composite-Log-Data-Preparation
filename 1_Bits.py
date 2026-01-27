@@ -214,7 +214,7 @@ def generate_bit_png(bit_no, size, depth_in, icon_bytes):
         target_h = int(target_w * aspect)
         icon = icon.resize((target_w, target_h), Image.LANCZOS)
         icon_x = (width - target_w) // 2
-        icon_y = 95   # ← you can adjust this number higher/lower
+        icon_y = 200   # ← you can adjust this number higher/lower
         image.paste(icon, (icon_x, icon_y), icon if icon.mode == 'RGBA' else None)
 
     # Bottom depth
