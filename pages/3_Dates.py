@@ -97,7 +97,7 @@ def generate_date_png(no, selected_date, depth):
 
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
-        font = ImageFont.truetype(font_path, 105)  # Large font to match figure # ← reduced from 120 → safer for long dates
+        font = ImageFont.truetype(font_path, 100)  # Large font to match figure # ← reduced from 120 → safer for long dates
     except:
         font = ImageFont.load_default()
 
