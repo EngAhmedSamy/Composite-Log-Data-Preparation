@@ -27,7 +27,7 @@ for size in bit_sizes:
     if size not in st.session_state.bit_icons:
         fname = size.replace('"', '') + ".png"  # 17.5" → 17.5.png
         try:
-            with open(f"icons/{fname}", "rb") as f:
+            with open(f"assets/bits/{fname}", "rb") as f:
                 st.session_state.bit_icons[size] = f.read()
         except FileNotFoundError:
             pass
