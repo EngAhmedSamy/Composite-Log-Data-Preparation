@@ -97,18 +97,18 @@ def generate_date_png(no, selected_date, depth):
 
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
-        font = ImageFont.truetype(font_path, 120)  # Large font to match figure
+        font = ImageFont.truetype(font_path, 105)  # Large font to match figure # ← reduced from 120 → safer for long dates
     except:
         font = ImageFont.load_default()
 
-    date_text = selected_date.strftime("%d/%m/%Y")
-    bbox = draw.textbbox((0, 0), date_text, font=font)
+    date_text = selected_date.strftime("%d/%m/%Y")  # e.g. "27/01/2026"
+    bbox = draw.textbbox((0, 0), date_text, font=font)  # Get bounding box to calculate exact centering
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
 
-    # Center text
+    # Center text # Center horizontally & vertically with small offset upward # Draw red text
     draw.text(
-        ((width - text_w) // 2, (height - text_h) // 2),
+        ((width - text_w) // 2, (height - text_h) // 2 - 8),  # ← -8 moves text slightly up (tune this: -15 to +5)
         date_text,
         fill=(255, 0, 0, 255),  # Red
         font=font
