@@ -8,53 +8,40 @@ import cv2
 import pytesseract
 import re
 
-st.set_page_config(
-    page_title="Petrel Composite Log Prep",
-    layout="wide",
-    page_icon="🛢️"   # optional
-)
-
+st.set_page_config(page_title="Petrel Composite Log Prep", layout="wide", page_icon="🛢️"   # optional)
+                   
 st.title("Petrel Composite Log Data Preparation App")
-st.markdown("### Tab 1: 1-Bits (After 30 & After 70)")
+st.markdown("### Tab 1: Bits (After 30 & After 70)")
+              
+#st.title("1 - Bits (After 30 & After 70)")
 
-# Session state for data
-if 'bits_data' not in st.session_state:
-    st.session_state.bits_data = pd.DataFrame(columns=["Bit Number", "Size", "Depth In"])
+# ────────────────────────────────────────────────
+#   Icons (from repo + optional override)
+# ────────────────────────────────────────────────
+bit_sizes = ["8.5\"", "12.25\"", "17.5\""]
 
-# Icons dictionary (size to file bytes)
-# Icons dictionary (size → bytes)
-if 'icons' not in st.session_state:
-    st.session_state.icons = {}
+if 'bit_icons' not in st.session_state:
+    st.session_state.bit_icons = {}
 
-# Load default icons from repo folder (icons/8.5.png etc.)
-common_sizes = ["None", "8.5\"", "12.25\"", "17.5\""]
-for size in common_sizes:
-    # Only load if not already in session (prevents override loss on reruns)
-    if size not in st.session_state.icons:
-        file_name = size.replace('"', '') + '.png'  # 17.5" → 17.5.png
+for size in bit_sizes:
+    if size not in st.session_state.bit_icons:
+        fname = size.replace('"', '') + ".png"  # 17.5" → 17.5.png
         try:
-            with open(f"assets/bits/{file_name}", "rb") as f:
-                st.session_state.icons[size] = f.read()
-            # Optional: show success once
-            if 'icons_loaded' not in st.session_state:
-                st.session_state.icons_loaded = True
-                st.toast(f"Default icon loaded for {size}", icon="✅")
+            with open(f"icons/{fname}", "rb") as f:
+                st.session_state.bit_icons[size] = f.read()
         except FileNotFoundError:
-            pass  # Will be handled in warning later if missing
+            pass
 
-# Optional: let user override/replace any icon
-with st.expander("Override / Replace Default Icons (optional)"):
-    for size in common_sizes:
-        uploaded = st.file_uploader(
-            f"Replace icon for {size}",
-            type=["png", "jpg", "jpeg"],
-            key=f"override_{size.replace('.', '_')}"
-        )
-        if uploaded:
-            st.session_state.icons[size] = uploaded.getvalue()
-            st.success(f"Icon for {size} replaced!")
+with st.expander("Override bit icons (optional)"):
+    for size in bit_sizes:
+        f = st.file_uploader(f"Replace icon for {size}", type=["png","jpg"], key=f"bit_up_{size}")
+        if f is not None:
+            st.session_state.bit_icons[size] = f.getvalue()
+            st.success(f"{size} icon updated")
 
+# ────────────────────────────────────────────────
 # Section: Upload mud log file (PDF or image) for OCR
+# ────────────────────────────────────────────────
 mud_log = st.file_uploader("Upload Mud Log File (PDF or Image for OCR extraction)", type=["pdf", "png", "jpg", "jpeg"])
 if mud_log:
     try:
@@ -100,40 +87,98 @@ if mud_log:
     except Exception as e:
         st.error(f"Processing error: {e}")
 
-# Data editor for manual input/editing
-st.subheader("Bit Data (Edit/Add Rows)")
-edited_data = st.data_editor(
-    st.session_state.bits_data,
-    num_rows="dynamic",
-    column_config={
-        "Bit Number": st.column_config.NumberColumn(help="Integer bit number (auto-assigned if blank)"),
-        "Size": st.column_config.SelectboxColumn(
-            options=common_sizes,
-            help="Choose bit size",
-            required=True
-        ),
-        "Depth In": st.column_config.NumberColumn(help="Depth in (integer)")
-    },
-    use_container_width=True
-)
+# ────────────────────────────────────────────────
+#   Data storage
+# ────────────────────────────────────────────────
+if 'bits_data' not in st.session_state:
+    st.session_state.bits_data = pd.DataFrame(columns=["Bit Number", "Size", "Depth In"])
 
-# Auto-assign Bit Number for new rows (where NaN)
-if not edited_data.empty:
-    max_bit = edited_data['Bit Number'].max()
-    if pd.isna(max_bit):
-        max_bit = 0
-    for idx in edited_data[pd.isna(edited_data['Bit Number'])].index:
-        max_bit += 1
-        edited_data.at[idx, 'Bit Number'] = max_bit
 
-st.session_state.bits_data = edited_data
+# ────────────────────────────────────────────────
+#   Add new bit form
+# ────────────────────────────────────────────────
+st.subheader("Add new Bit")
 
-# Function to generate PNG (from previous update)
+cols = st.columns([1.2, 2.5, 1.8, 1])
+with cols[0]:
+    bit_no = st.number_input(
+        "Bit #",
+        min_value=1,
+        step=1,
+        value=None,
+        key="new_bit_no"
+    )
+
+with cols[1]:
+    bit_size = st.selectbox(
+        "Bit Size",
+        options=bit_sizes,
+        index=None,
+        placeholder="Select size...",
+        key="new_bit_size"
+    )
+
+with cols[2]:
+    depth_in = st.number_input(
+        "Depth In (ft)",
+        min_value=0,
+        step=1,
+        value=None,
+        key="new_bit_depth"
+    )
+
+if st.button("➕ Add Bit", type="primary", use_container_width=True):
+    if bit_no is not None and bit_size and depth_in is not None:
+        new_row = pd.DataFrame({
+            "Bit Number": [int(bit_no)],
+            "Size": [bit_size],
+            "Depth In": [int(depth_in)]
+        })
+        st.session_state.bits_data = pd.concat(
+            [st.session_state.bits_data, new_row],
+            ignore_index=True
+        )
+        st.success(f"Added Bit #{bit_no} - {bit_size} @ {depth_in} ft")
+        st.rerun()
+    else:
+        st.warning("Please fill all three fields")
+
+
+# ────────────────────────────────────────────────
+#   Show current bits + delete
+# ────────────────────────────────────────────────
+st.subheader("Current Bits")
+
+if st.session_state.bits_data.empty:
+    st.info("No bits added yet. Use the form above.")
+else:
+    st.dataframe(
+        st.session_state.bits_data,
+        use_container_width=True,
+        hide_index=False
+    )
+
+    to_remove = st.multiselect(
+        "Select bit(s) to remove",
+        options=st.session_state.bits_data.index.tolist(),
+        format_func=lambda i: f"Bit {st.session_state.bits_data.loc[i, 'Bit Number']} - {st.session_state.bits_data.loc[i, 'Size']} @ {st.session_state.bits_data.loc[i, 'Depth In']}'"
+    )
+
+    if st.button("🗑️ Remove selected", type="secondary"):
+        if to_remove:
+            st.session_state.bits_data = st.session_state.bits_data.drop(to_remove).reset_index(drop=True)
+            st.success(f"Removed {len(to_remove)} bit(s)")
+            st.rerun()
+
+
+# ────────────────────────────────────────────────
+#   PNG generation function (your previous version)
+# ────────────────────────────────────────────────
 def generate_bit_png(bit_no, size, depth_in, icon_bytes):
     width, height = 299, 598
     image = Image.new('RGBA', (width, height), (255, 255, 255, 255))
     draw = ImageDraw.Draw(image)
-    
+
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
         big_font = ImageFont.truetype(font_path, 52)
@@ -144,87 +189,96 @@ def generate_bit_png(bit_no, size, depth_in, icon_bytes):
         size_font = ImageFont.load_default()
         depth_font = ImageFont.load_default()
 
-    # Top text: "BIT #1,"
-    top_text = f"BIT #{bit_no},"
+    # Top: BIT #1,
+    top_text = f"BIT #{int(bit_no)},"
     bbox = draw.textbbox((0, 0), top_text, font=big_font)
     text_w = bbox[2] - bbox[0]
-    x = (width - text_w) // 2
-    y_top = 25
-    draw.text((x, y_top), top_text, fill="black", font=big_font)
+    draw.text(((width - text_w) // 2, 25), top_text, fill="black", font=big_font)
 
-    # Size line with underline
+    # Size with underline
     size_text = f"{size.replace('\"', '')}''"
     bbox_size = draw.textbbox((0, 0), size_text, font=size_font)
     size_w = bbox_size[2] - bbox_size[0]
     x_size = (width - size_w) // 2
-    y_size = y_top + 65
+    y_size = 90
     draw.text((x_size, y_size), size_text, fill="black", font=size_font)
-    
-    # underline_y = y_size + 50
-    # underline_start = x_size - 8
-    # underline_end = x_size + size_w + 8
-    # draw.line([(underline_start, underline_y), (underline_end, underline_y)], fill="black", width=4)
 
-    # Bit icon
-    icon_y_start = 170
+    #underline_y = y_size + 48
+    #draw.line([(x_size - 10, underline_y), (x_size + size_w + 10, underline_y)], fill="black", width=5)
+
+    # Icon
     if icon_bytes:
         icon = Image.open(io.BytesIO(icon_bytes))
-        target_width = int(width * 0.82)
+        target_w = int(width * 0.82)
         aspect = icon.height / icon.width
-        target_height = int(target_width * aspect)
-        icon = icon.resize((target_width, target_height), Image.LANCZOS)
-        icon_x = (width - target_width) // 2
-        image.paste(icon, (icon_x, icon_y_start), icon if icon.mode == 'RGBA' else None)
+        target_h = int(target_w * aspect)
+        icon = icon.resize((target_w, target_h), Image.LANCZOS)
+        icon_x = (width - target_w) // 2
+        icon_y = 95   # ← you can adjust this number higher/lower
+        image.paste(icon, (icon_x, icon_y), icon if icon.mode == 'RGBA' else None)
 
     # Bottom depth
-    depth_text = f"{depth_in}'"
-    bbox_depth = draw.textbbox((0, 0), depth_text, font=depth_font)
-    depth_w = bbox_depth[2] - bbox_depth[0]
-    x_depth = (width - depth_w) // 2
-    y_depth = height - 110
-    draw.text((x_depth, y_depth), depth_text, fill="black", font=depth_font)
+    bottom_text = f"{int(depth_in)}'"
+    bbox = draw.textbbox((0, 0), bottom_text, font=depth_font)
+    text_w = bbox[2] - bbox[0]
+    draw.text(((width - text_w) // 2, height - 110), bottom_text, fill="black", font=depth_font)
 
     image.info['dpi'] = (150, 150)
     buf = io.BytesIO()
     image.save(buf, format="PNG", dpi=(150, 150))
     buf.seek(0)
-    return buf
+    return buf.getvalue()
 
-# Preview and Download
-st.subheader("Previews and Downloads")
-zip_buf = io.BytesIO()
-with zipfile.ZipFile(zip_buf, "w") as zf:
-    for idx, row in st.session_state.bits_data.iterrows():
-        bit_no = row["Bit Number"]
-        size = row["Size"]
-        depth_in = row["Depth In"]
-        
-        if pd.isna(bit_no) or pd.isna(size) or pd.isna(depth_in):
-            continue
-        
-        icon_bytes = st.session_state.icons.get(size, None)
-        if not icon_bytes:
-            st.warning(f"No icon for size {size}. Skipping Bit {bit_no}.")
-            continue
-        
-        png_buf = generate_bit_png(int(bit_no), size, int(depth_in), icon_bytes)
-        
-        st.image(png_buf.getvalue(), caption=f"Bit {bit_no}", width=150)
-        
-        d30 = int(depth_in) + 30
-        d70 = int(depth_in) + 70
-        filename = f"Bit {bit_no}. ({d30} - {d70}).png"
-        
-        st.download_button(f"Download {filename}", data=png_buf.getvalue(), file_name=filename, mime="image/png")
-        
-        zf.writestr(filename, png_buf.getvalue())
+
+# ────────────────────────────────────────────────
+#   Previews & Downloads
+# ────────────────────────────────────────────────
+st.subheader("Previews & Downloads")
 
 if not st.session_state.bits_data.empty:
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w") as zf:
+        for i, row in st.session_state.bits_data.iterrows():
+            bit_no = row["Bit Number"]
+            size = row["Size"]
+            depth = row["Depth In"]
+
+            if pd.isna(bit_no) or pd.isna(size) or pd.isna(depth):
+                continue
+
+            icon_bytes = st.session_state.bit_icons.get(size)
+            if not icon_bytes:
+                st.warning(f"No icon for size {size} — skipping Bit {bit_no}")
+                continue
+
+            png_bytes = generate_bit_png(bit_no, size, depth, icon_bytes)
+
+            st.image(png_bytes, width=140, caption=f"Bit {bit_no} - {size} @ {depth}'")
+
+            d30 = int(depth) + 30
+            d70 = int(depth) + 70
+            safe_size = size.replace('"', '')
+            fname = f"Bit {int(bit_no)}. ({d30} - {d70}).png"
+
+            st.download_button(
+                f"Download {fname}",
+                png_bytes,
+                file_name=fname,
+                mime="image/png",
+                key=f"bit_dl_{i}"
+            )
+
+            zf.writestr(fname, png_bytes)
+
     zip_buf.seek(0)
-    st.download_button("Download All as ZIP", data=zip_buf, file_name="bits_pngs.zip", mime="application/zip")
-
+    st.download_button(
+        "Download all Bits as ZIP",
+        zip_buf.getvalue(),
+        file_name="bits_all.zip",
+        mime="application/zip"
+    )
 else:
-    st.info("Add at least one Bit row above to generate PNGs")
+    st.info("Add at least one bit above to generate previews/downloads.")
 
 
-st.success("1-Bits tab is ready & stable!")
+
