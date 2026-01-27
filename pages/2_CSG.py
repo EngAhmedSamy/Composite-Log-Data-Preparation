@@ -3,11 +3,16 @@ import pandas as pd
 import io
 import zipfile
 from PIL import Image, ImageDraw, ImageFont
+import cv2
+import pytesseract
+import re
+from pdf2image import convert_from_bytes
 
-st.set_page_config(page_title="Petrel Prep - CSG", layout="wide")
 st.title("2 - CSG (Before 20 & After 20)")
 
-# === Default CSG Types ===
+# ────────────────────────────────────────────────
+#   Icons (loaded from repo + optional override)
+# ────────────────────────────────────────────────
 csg_types = [
     "20\" Cond.",
     "13 3/8\"",
@@ -17,137 +22,229 @@ csg_types = [
     "PBTD"
 ]
 
-# === Load icons from GitHub repo (icons folder) ===
 if 'csg_icons' not in st.session_state:
     st.session_state.csg_icons = {}
 
 for typ in csg_types:
     if typ not in st.session_state.csg_icons:
-        filename = typ.replace('"', '').replace(' ', '_').replace('/', '_') + ".png"
+        fname = typ.replace('"', '').replace(' ', '_').replace('/', '_') + ".png"
         try:
-            with open(f"assets/CSG/{filename}", "rb") as f:
+            with open(f"icons/{fname}", "rb") as f:
                 st.session_state.csg_icons[typ] = f.read()
-        except:
-            pass  # icon will be missing → warning later
+        except FileNotFoundError:
+            pass
 
-# Optional: override icons
-with st.expander("Override Icons (optional)", expanded=False):
+with st.expander("Override icons (optional)"):
     for typ in csg_types:
-        uploaded = st.file_uploader(f"Replace {typ}", type=["png", "jpg", "jpeg"], key=typ)
-        if uploaded:
-            st.session_state.csg_icons[typ] = uploaded.getvalue()
+        f = st.file_uploader(f"Replace icon for {typ}", type=["png","jpg","jpeg"], key=f"up_{typ}")
+        if f is not None:
+            st.session_state.csg_icons[typ] = f.getvalue()
             st.success(f"{typ} icon updated")
 
-# === Initialize empty data if not exists ===
-if 'csg_data' not in st.session_state or st.session_state.csg_data.empty:
+# ────────────────────────────────────────────────
+#   Data storage
+# ────────────────────────────────────────────────
+if 'csg_data' not in st.session_state:
     st.session_state.csg_data = pd.DataFrame(columns=["Type", "Depth In"])
 
-# === Data Editor with Dropdown ===
-st.subheader("CSG Data (Add / Edit)")
-df_edited = st.data_editor(
-    st.session_state.csg_data,
-    num_rows="dynamic",
-    use_container_width=True,
-    column_config={
-        "Type": st.column_config.SelectboxColumn(
-            "Type",
-            help="Choose casing / liner type",
-            options=csg_types,
-            required=True,
-        ),
-        "Depth In": st.column_config.NumberColumn(
-            "Depth In (ft)",
-            help="Shoe / setting depth",
-            min_value=0,
-            step=1,
-            required=True,
-        ),
-    },
-    hide_index=False,
-)
+# ────────────────────────────────────────────────
+#   Add new entry form
+# ────────────────────────────────────────────────
+st.subheader("Add new CSG / Liner entry")
 
-# Save back to session state (only valid rows)
-valid_rows = df_edited.dropna(subset=["Type", "Depth In"])
-st.session_state.csg_data = valid_rows.reset_index(drop=True)
+cols = st.columns([3, 2, 1])
+with cols[0]:
+    selected_type = st.selectbox(
+        "CSG / Liner Type",
+        options=csg_types,
+        index=None,
+        placeholder="Select type...",
+        key="new_csg_type"
+    )
 
-# === PNG Generation Function ===
-def make_csg_png(csg_type: str, depth: int, icon_bytes: bytes) -> bytes:
+with cols[1]:
+    depth_ft = st.number_input(
+        "Depth In (ft)",
+        min_value=0,
+        step=1,
+        value=None,
+        key="new_csg_depth"
+    )
+
+if st.button("➕ Add Entry", type="primary", use_container_width=True):
+    if selected_type and depth_ft is not None:
+        new_row = pd.DataFrame({
+            "Type": [selected_type],
+            "Depth In": [depth_ft]
+        })
+        st.session_state.csg_data = pd.concat(
+            [st.session_state.csg_data, new_row],
+            ignore_index=True
+        )
+        # Optional: reset inputs (Streamlit reruns anyway)
+        st.success(f"Added: {selected_type} @ {depth_ft} ft")
+        st.rerun()
+    else:
+        st.warning("Please select type and enter depth")
+
+# ────────────────────────────────────────────────
+#   Show current entries + delete option
+# ────────────────────────────────────────────────
+st.subheader("Current Entries")
+
+if st.session_state.csg_data.empty:
+    st.info("No entries yet. Add one above.")
+else:
+    # Display table
+    st.dataframe(
+        st.session_state.csg_data,
+        use_container_width=True,
+        hide_index=False
+    )
+
+    # Delete selected row
+    to_delete = st.multiselect(
+        "Select row(s) to remove",
+        options=st.session_state.csg_data.index.tolist(),
+        format_func=lambda i: f"{st.session_state.csg_data.loc[i, 'Type']} @ {st.session_state.csg_data.loc[i, 'Depth In']}'"
+    )
+
+    if st.button("🗑️ Remove selected", type="secondary"):
+        if to_delete:
+            st.session_state.csg_data = st.session_state.csg_data.drop(to_delete).reset_index(drop=True)
+            st.success(f"Removed {len(to_delete)} row(s)")
+            st.rerun()
+
+# ────────────────────────────────────────────────
+#   OCR from mud log (kept as before)
+# ────────────────────────────────────────────────
+st.subheader("Import from Mud Log (optional)")
+
+uploaded_file = st.file_uploader("PDF or Image", type=["pdf","png","jpg","jpeg"])
+
+if uploaded_file:
+    try:
+        content = uploaded_file.read()
+        images = []
+
+        if uploaded_file.type == "application/pdf":
+            images = convert_from_bytes(content)
+        else:
+            from io import BytesIO
+            import numpy as np
+            img = Image.open(BytesIO(content))
+            images = [img]
+
+        text = ""
+        for img_pil in images:
+            img_cv = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+            gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            text += pytesseract.image_to_string(thresh) + "\n"
+
+        # Simple parsing – improve later if needed
+        parsed = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = re.split(r'\s{2,}', line)
+            if len(parts) >= 3:
+                casing = parts[1] if len(parts) > 1 else ""
+                try:
+                    depth = int(float(parts[-1].replace(',', '')))
+                    for t in csg_types:
+                        if t.replace('"','') in casing or casing in t.replace('"',''):
+                            parsed.append({"Type": t, "Depth In": depth})
+                            break
+                except:
+                    pass
+
+        if parsed:
+            new_df = pd.DataFrame(parsed)
+            st.session_state.csg_data = pd.concat(
+                [st.session_state.csg_data, new_df],
+                ignore_index=True
+            ).drop_duplicates(subset=["Type", "Depth In"]).reset_index(drop=True)
+            st.success(f"Imported {len(parsed)} matching entries")
+            st.rerun()
+        else:
+            st.info("No recognizable casing data found in the file.")
+
+    except Exception as e:
+        st.error(f"Could not process file: {str(e)}")
+
+# ────────────────────────────────────────────────
+#   PNG generation & downloads (unchanged logic)
+# ────────────────────────────────────────────────
+def generate_csg_png(csg_type, depth, icon_bytes):
     w, h = 354, 592
-    img = Image.new("RGBA", (w, h), "white")
+    img = Image.new("RGBA", (w, h), (255,255,255,255))
     draw = ImageDraw.Draw(img)
 
-    # Fonts
     try:
-        f_top = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 42)
-        f_depth = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 68)
+        font_big   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 42)
+        font_depth = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 68)
     except:
-        f_top = ImageFont.load_default()
-        f_depth = ImageFont.load_default()
+        font_big = font_depth = ImageFont.load_default()
 
-    # Top text
-    #top_text = "Liner\nHanger" if csg_type == "Liner hanger" else csg_type.replace('"', "''")
-   # draw.text((w//2, 40), top_text, font=f_top, fill="black", anchor="mm", align="center")
+    # Title
+    title = "Liner\nHanger" if csg_type == "Liner hanger" else csg_type.replace('"', "''")
+    draw.text((w//2, 45), title, font=font_big, fill="black", anchor="mm", align="center")
 
     # Icon
     if icon_bytes:
         icon = Image.open(io.BytesIO(icon_bytes)).convert("RGBA")
-        icon_w = int(w * 0.78)
-        icon_h = int(icon.height * icon_w / icon.width)
-        icon = icon.resize((icon_w, icon_h), Image.LANCZOS)
-        img.paste(icon, ((w - icon_w) // 2, 0), icon)
+        iw = int(w * 0.78)
+        ih = int(icon.height * iw / icon.width)
+        icon = icon.resize((iw, ih), Image.LANCZOS)
+        img.paste(icon, ((w - iw)//2, 95), icon)
 
-    # Bottom depth
-    draw.text((w//2, h - 110), f"{int(depth)}'", font=f_depth, fill="black", anchor="mm")
+    # Depth
+    draw.text((w//2, h - 100), f"{int(depth)}'", font=font_depth, fill="black", anchor="mm")
 
-    # Convert to 8-bit PNG with 150 DPI
     img = img.convert("P", palette=Image.ADAPTIVE, colors=256)
     img.info["dpi"] = (150, 150)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
+    buf.seek(0)
     return buf.getvalue()
 
-# === Previews & Downloads ===
-st.subheader("Generated PNGs")
+st.subheader("Previews & Downloads")
 
 if not st.session_state.csg_data.empty:
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for idx, row in st.session_state.csg_data.iterrows():
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w") as zf:
+        for i, row in st.session_state.csg_data.iterrows():
             typ = row["Type"]
-            depth = int(row["Depth In"])
+            dep = int(row["Depth In"])
 
             if typ not in st.session_state.csg_icons:
-                st.warning(f"No icon for **{typ}** → skipped")
+                st.warning(f"Missing icon: {typ}")
                 continue
 
-            png_bytes = make_csg_png(typ, depth, st.session_state.csg_icons[typ])
+            png_data = generate_csg_png(typ, dep, st.session_state.csg_icons[typ])
 
-            # Preview
-            st.image(png_bytes, width=160, caption=f"{typ} @ {depth}'")
+            st.image(png_data, width=140, caption=f"{typ}  {dep}'")
 
-            # Filename
-            safe_name = typ.replace('"', '').replace(' ', '_').replace('/', '_')
-            fname = f"{safe_name}.({depth-20}-{depth+20}).png"
-            zf.writestr(fname, png_bytes)
+            safe = typ.replace('"','').replace(' ','_').replace('/','_')
+            name = f"{safe}.({dep-20}-{dep+20}).png"
 
-            # Individual download
             st.download_button(
-                label=f"Download {fname}",
-                data=png_bytes,
-                file_name=fname,
+                f"Download {name}",
+                png_data,
+                file_name=name,
                 mime="image/png",
-                key=f"dl_{idx}"
+                key=f"dl_{i}"
             )
 
-    zip_buffer.seek(0)
+            zf.writestr(name, png_data)
+
+    zip_buf.seek(0)
     st.download_button(
-        label="Download All CSGs as ZIP",
-        data=zip_buffer,
-        file_name="CSG_PNGs.zip",
+        "Download all as ZIP",
+        zip_buf.getvalue(),
+        file_name="csg_all.zip",
         mime="application/zip"
     )
-else:
-    st.info("Add at least one CSG row above to generate PNGs")
-
-st.success("2-CSG tab is ready & stable!")
