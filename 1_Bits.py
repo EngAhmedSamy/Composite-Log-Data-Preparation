@@ -219,7 +219,7 @@ def generate_bit_png(bit_no, size, depth_in, icon_bytes):
         
         # Special adjustment only for 17.5" bit
         if size == "17.5\"":
-            icon_y = 190   # ← ← ← CHANGE THIS VALUE to control height for 17.5" only
+            icon_y = 185   # ← ← ← CHANGE THIS VALUE to control height for 17.5" only
         
         image.paste(icon, (icon_x, icon_y), icon if icon.mode == 'RGBA' else None)
 
