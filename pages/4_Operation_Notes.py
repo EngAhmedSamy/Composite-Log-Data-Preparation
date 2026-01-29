@@ -1,107 +1,129 @@
 import streamlit as st
 import pandas as pd
 import io
-from PIL import Image
-import pytesseract
+import re
 from pdf2image import convert_from_bytes
+import pytesseract
 import cv2
 import numpy as np
-import re
 
 st.title("4 - Operation Notes (Same Depth & After 15)")
 
-# ────────────────────────────────────────────────
-#   Data storage
-# ────────────────────────────────────────────────
+# Session state for data
 if 'op_notes_data' not in st.session_state:
-    st.session_state.op_notes_data = pd.DataFrame(columns=["Depth1", "Depth2", "Notes"])
+    st.session_state.op_notes_data = pd.DataFrame(columns=["Depth1", "Depth2", "Quote", "Notes"])
 if 'well_name' not in st.session_state:
-    st.session_state.well_name = "Well Name"
+    st.session_state.well_name = "Unknown Well"
 
-# ────────────────────────────────────────────────
-#   Entry options
-# ────────────────────────────────────────────────
+# Data Entry Options
 st.subheader("Data Entry Options")
-
 tab1, tab2 = st.tabs(["1. Upload Mud Log PDF", "2. Upload Excel Sheet"])
 
-wwith tab1:
-    pdf_file = st.file_uploader("Upload Mud Log PDF", type=["pdf"])
+with tab1:
+    pdf_file = st.file_uploader("Upload Mud Log PDF", type="pdf")
     if pdf_file:
         try:
             images = convert_from_bytes(pdf_file.read())
-            all_text = ""
+            extracted = []
             well_name = None
 
-            for idx, pil_img in enumerate(images):
-                # Optional: save for debug
-                # pil_img.save(f"page_{idx}.png")
+            for page in images:
+                img_cv = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
+                text = pytesseract.image_to_string(img_cv)
+                lines = [line.strip() for line in text.splitlines() if line.strip()]
 
-                # OCR with data (bounding boxes)
-                data = pytesseract.image_to_data(pil_img, output_type=pytesseract.Output.DICT)
+                if not well_name:
+                    match = re.search(r'Well:\s*(\S+)', text)
+                    if match:
+                        well_name = match.group(1)
+                        st.session_state.well_name = well_name
 
-                n_boxes = len(data['level'])
-                for i in range(n_boxes):
-                    text = data['text'][i].strip()
-                    if not text:
+                in_section = False
+                current_depth = None
+                note_lines = []
+
+                for line in lines:
+                    if "LITHOLOGY DESCRIPTIONS AND REMARKS" in line.upper():
+                        in_section = True
                         continue
+                    if in_section:
+                        depth_match = re.match(r'^(\d{3,5})\s', line)
+                        if depth_match:
+                            if current_depth is not None and note_lines:
+                                extracted.append({
+                                    "Depth1": current_depth,
+                                    "Depth2": current_depth + 15,
+                                    "Quote": '"',
+                                    "Notes": ' '.join(note_lines)
+                                })
+                            current_depth = int(depth_match.group(1))
+                            note_lines = []
+                            line = line[depth_match.end():].strip()
 
-                    # Detect well name
-                    if not well_name and "Well" in text:
-                        well_name = text.split("Well")[-1].strip().split()[0]
+                        # Skip lithology
+                        if re.match(r'^(LST|SH|SST|SD|CLY|GY|MARL|ANH|SLT|DL|LS|MD|PK|WD|GLC|HAL|PYR|QZ|FLD|BAS|GRN|VOL|IGN|MET|UNK)\b', line.upper()):
+                            continue
 
-                    # Collect potential depth lines (e.g., numbers like 1700, 4185)
-                    if re.match(r'^\d{3,5}$', text):  # simple depth pattern
-                        depth = int(text)
-                        # Look for notes nearby (next lines or same block)
-                        # This is basic — improve with y-coordinate grouping later
-                        note_candidates = []
-                        for j in range(i+1, min(i+10, n_boxes)):
-                            note_text = data['text'][j].strip()
-                            if note_text and not re.match(r'^(LST|SH|SST|SD|CLY|GY|MARL|ANH|SLT|DL|LS|MD|PK|WD|GLC|HAL|PYR|QZ|FLD|BAS|GRN|VOL|IGN|MET|UNK)\b', note_text.upper()):
-                                note_candidates.append(note_text)
+                        if line:
+                            note_lines.append(line)
 
-                        if note_candidates:
-                            combined_note = " ".join(note_candidates)
-                            extracted.append({"Depth1": depth, "Notes": combined_note})
+                if current_depth is not None and note_lines:
+                    extracted.append({
+                        "Depth1": current_depth,
+                        "Depth2": current_depth + 15,
+                        "Quote": '"',
+                        "Notes": ' '.join(note_lines)
+                    })
 
             if extracted:
-                df = pd.DataFrame(extracted)
-                df["Depth2"] = df["Depth1"] + 15  # After 15 rule
-                st.session_state.op_notes_data = pd.concat([st.session_state.op_notes_data, df[["Depth1", "Depth2", "Notes"]]], ignore_index=True)
-                if well_name:
-                    st.session_state.well_name = well_name
-                st.success(f"Extracted {len(extracted)} operation notes with depths")
+                new_df = pd.DataFrame(extracted)
+                st.session_state.op_notes_data = pd.concat([st.session_state.op_notes_data, new_df]).drop_duplicates().reset_index(drop=True)
+                st.success(f"Extracted {len(extracted)} notes from PDF")
             else:
-                st.warning("No colored/boxed operation notes detected. Try manual edit or Excel upload.")
+                st.warning("No operation notes extracted")
 
         except Exception as e:
-            st.error(f"Error processing PDF: {str(e)}")
-            
+            st.error(f"PDF processing error: {e}")
+
 with tab2:
     excel_file = st.file_uploader("Upload Excel Sheet", type=["xlsx", "xls"])
     if excel_file:
         try:
-            df = pd.read_excel(excel_file)
-            # Assume columns: Depth1, Depth2, Notes, and Well Name in cell or header
-            if 'Well' in df.columns or df.iloc[0].str.contains('Well').any():
-                well_name = df[df.iloc[:,0].str.contains('Well', na=False)].iloc[0,1] if not df.empty else "Well Name"
-                st.session_state.well_name = well_name
-            # Filter to data rows
-            data_df = df[["Depth1", "Depth2", "Notes"]]  # Adjust column names if different
-            st.session_state.op_notes_data = pd.concat([st.session_state.op_notes_data, data_df])
-            st.success("Loaded data from Excel")
-        except Exception as e:
-            st.error(f"Error processing Excel: {e}")
+            df = pd.read_excel(excel_file, sheet_name=None)
+            sheets = list(df.keys())
+            selected_sheet = st.selectbox("Select Sheet", sheets)
 
-# ────────────────────────────────────────────────
-#   Current entries (editable table)
-# ────────────────────────────────────────────────
-st.subheader("Current Operation Notes Entries")
+            sheet_df = df[selected_sheet]
+            # Assume columns: Depth Start or Depth1, Depth End or Depth2, Comment or Notes
+            columns = sheet_df.columns.tolist()
+            depth1_col = st.selectbox("Depth1 Column", columns, index=columns.index("Depth Start") if "Depth Start" in columns else 0)
+            depth2_col = st.selectbox("Depth2 Column", columns, index=columns.index("Depth End") if "Depth End" in columns else 1)
+            notes_col = st.selectbox("Notes Column", columns, index=columns.index("Comment") if "Comment" in columns else 2)
+
+            data_df = sheet_df[[depth1_col, depth2_col, notes_col]].rename(columns={
+                depth1_col: "Depth1",
+                depth2_col: "Depth2",
+                notes_col: "Notes"
+            })
+            data_df["Quote"] = '"'
+            st.session_state.op_notes_data = pd.concat([st.session_state.op_notes_data, data_df[["Depth1", "Depth2", "Quote", "Notes"]]]).reset_index(drop=True)
+
+            # Well name from Excel
+            well_match = re.search(r'Well:\s*(\S+)', sheet_df.to_string())
+            if well_match:
+                st.session_state.well_name = well_match.group(1)
+
+            st.success(f"Loaded {len(data_df)} notes from Excel")
+
+        except Exception as e:
+            st.error(f"Excel processing error: {e}")
+
+# Current Entries - Editable Table
+st.subheader("Current Entries (QC & Edit)")
 st.write(f"Fixed Well Name: {st.session_state.well_name}")
 
 if st.session_state.op_notes_data.empty:
-    st.info("No notes yet. Upload or add manually.")
+    st.info("No data. Upload to start.")
 else:
     edited_df = st.data_editor(
         st.session_state.op_notes_data,
@@ -109,37 +131,41 @@ else:
         column_config={
             "Depth1": st.column_config.NumberColumn("Depth1", min_value=0, step=1),
             "Depth2": st.column_config.NumberColumn("Depth2", min_value=0, step=1),
-            "Notes": st.column_config.TextColumn("Notes")
+            "Quote": st.column_config.TextColumn("Quote", default='"', width="small"),
+            "Notes": st.column_config.TextColumn("Notes", width="large")
         },
-        use_container_width=True
+        use_container_width=True,
+        hide_index=False
     )
 
-    # Auto-set Depth2 = Depth1 + 10
-    edited_df["Depth2"] = edited_df["Depth1"] + 10
-    st.session_state.op_notes_data = edited_df
+    # Auto-update Depth2 if Depth1 changed
+    edited_df["Depth2"] = edited_df["Depth1"] + 15
+    edited_df["Quote"] = '"'
+    st.session_state.op_notes_data = edited_df.reset_index(drop=True)
 
-# ────────────────────────────────────────────────
-#   Preview and download formatted text file
-# ────────────────────────────────────────────────
-st.subheader("Formatted Text Preview & Download")
+# Preview & Download PRN
+st.subheader("Formatted PRN Preview & Download")
 
 if not st.session_state.op_notes_data.empty:
-    # Generate space-delimited text
-    output = io.StringIO()
-    output.write(f"Well: {st.session_state.well_name}\n\n")
-    output.write("Depth1 Depth2 Notes\n")
+    prn_content = io.StringIO()
+    prn_content.write(f"Well:          {st.session_state.well_name}\n\n")
+
     for _, row in st.session_state.op_notes_data.iterrows():
-        output.write(f"{row['Depth1']:<6} {row['Depth2']:<6} {row['Notes']}\n")
+        depth1 = int(row["Depth1"])
+        depth2 = int(row["Depth2"])
+        quote = row["Quote"]
+        notes = row["Notes"]
+        prn_content.write(f"{depth1:>8} {depth2:>8} {quote:>1} {notes}\n")
 
     # Preview
-    st.code(output.getvalue(), language="text")
+    st.code(prn_content.getvalue(), language="text")
 
     # Download
     st.download_button(
-        label="Download Operation Notes TXT",
-        data=output.getvalue(),
-        file_name=f"Operation Notes ({st.session_state.well_name}).txt",
+        label="Download PRN File",
+        data=prn_content.getvalue(),
+        file_name=f"Operation notes ({st.session_state.well_name}).prn",
         mime="text/plain"
     )
 else:
-    st.info("No data to export.")
+    st.info("No data to preview/export.")
