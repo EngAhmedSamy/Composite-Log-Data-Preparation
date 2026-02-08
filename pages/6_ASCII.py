@@ -45,7 +45,7 @@ with tab_mud_drlg_params:
 # ────────────────────────────────────────────────
 with tab_desc_comment:
     st.header("Mud Log Description Comment")
-    st.subheader("This tab is for preparing the Mud Log Description Comment for:")
+    st.subheader("This tab is for preparing the Mud Log Description Comments for:")
 
     lith_types = ["Clay", "Shale", "Sand", "SST", "SLT.ST", "LST", "Oil Shows"]
     for lit in lith_types:
