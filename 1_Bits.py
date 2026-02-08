@@ -8,6 +8,12 @@ import cv2
 import pytesseract
 import re
 
+st.sidebar.header("Global Settings")
+well_name = st.sidebar.text_input("Well Name", value=st.session_state.get('well_name', 'Well Name'))
+if st.sidebar.button("Apply Well Name"):
+st.session_state.well_name = well_name
+st.rerun()
+
 st.set_page_config(page_title="Petrel Composite Log Prep", layout="wide", page_icon="🛢️")  # optional)
                    
 st.title("Petrel Composite Log Data Preparation App")
