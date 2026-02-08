@@ -25,66 +25,72 @@ with tab_gyro:
 
     if excel_file is not None:
         try:
-            # Read the sheet (assume 'GMS' or first sheet)
-            df = pd.read_excel(excel_file, sheet_name='GMS', header=None)  # No header to scan all cells
+            # Read without header to scan all cells
+            df = pd.read_excel(excel_file, sheet_name='GMS', header=None)
 
-            # Show first 20 rows for user reference
+            # Show first 20 rows for reference
             st.subheader("First 20 rows of the sheet (for reference)")
             st.dataframe(df.head(20), use_container_width=True)
 
-            # Step 1: Find well name (anywhere with "Well:")
+            # ──────────────────────────────
+            # Find Well Name (search all cells, look right or below)
+            # ──────────────────────────────
             well_name = st.session_state.get('well_name', 'Unknown Well')
+            found = False
             for i in range(len(df)):
                 for j in range(len(df.columns)):
-                    cell = str(df.iloc[i, j])
-                    if 'Well' in cell:
-                        match = re.search(r'Well\s*[:=-]?\s*([A-Za-z0-9_-]+)', cell, re.IGNORECASE)
-                        if match:
-                            well_name = match.group(1).strip()
+                    cell = str(df.iloc[i, j]).strip().upper()
+                    if 'WELL NAME' in cell or 'WELL' in cell:
+                        # Look right (same row, next cell)
+                        if j + 1 < len(df.columns) and pd.notna(df.iloc[i, j+1]):
+                            well_name = str(df.iloc[i, j+1]).strip()
+                            found = True
+                        # Look below (next row, same column)
+                        elif i + 1 < len(df) and pd.notna(df.iloc[i+1, j]):
+                            well_name = str(df.iloc[i+1, j]).strip()
+                            found = True
+                        if found:
                             break
-                if well_name != 'Unknown Well':
+                if found:
                     break
-            st.session_state.well_name = well_name
-            st.success(f"**Well Name detected:** {well_name}")
 
-            # Step 2: Find column indices by searching for "MD" + "FT" below, "INC" + "Deg" below, "AZI"
+            st.session_state.well_name = well_name
+            st.success(f"**Well Name:** {well_name}")
+
+            # ──────────────────────────────
+            # Find columns: MD (with FT below), INC (with DEG below), AZI
+            # ──────────────────────────────
             md_col = inc_col = azi_col = None
 
-            for i in range(len(df) - 1):  # -1 because we check i+1
+            for i in range(len(df) - 1):
                 for j in range(len(df.columns)):
                     cell = str(df.iloc[i, j]).strip().upper()
-                    below_cell = str(df.iloc[i+1, j]).strip().upper()
+                    below = str(df.iloc[i+1, j]).strip().upper()
 
-                    if "MD" in cell and "FT" in below_cell:
+                    if "MD" in cell and "FT" in below:
                         md_col = j
-                    if "INC" in cell and "DEG" in below_cell:
+                    if "INC" in cell and "DEG" in below:
                         inc_col = j
                     if "AZI" in cell:
                         azi_col = j
 
-            if md_col is None:
-                st.error("Could not find column with 'MD' and 'FT' below it.")
-            elif inc_col is None:
-                st.error("Could not find column with 'INC' and 'Deg' below it.")
-            elif azi_col is None:
-                st.error("Could not find column with 'AZI'.")
+            if md_col is None or inc_col is None or azi_col is None:
+                st.error("Could not locate MD/INC/AZI columns with correct units.")
             else:
-                # Extract data from the row AFTER the header row (i+1 for each)
-                # Assume data starts right after the header+unit row
-                header_row = min([i for i in range(len(df)) if df.iloc[i, md_col] == df.iloc[i, md_col]])  # rough
-                data_start = header_row + 2  # skip header and unit row
+                # Start reading from row after header + unit row
+                start_row = min([i for i in range(len(df)) if df.iloc[i, md_col] == df.iloc[i, md_col]]) + 2
 
                 # Extract the three columns
-                data_df = df.iloc[data_start:, [md_col, inc_col, azi_col]].copy()
+                data_df = df.iloc[start_row:, [md_col, inc_col, azi_col]].copy()
                 data_df.columns = ['MD', 'INC', 'AZI']
 
-                # Clean: convert to numeric, drop invalid rows
+                # Clean: convert numeric, drop invalid
                 data_df['MD'] = pd.to_numeric(data_df['MD'], errors='coerce')
                 data_df['INC'] = pd.to_numeric(data_df['INC'], errors='coerce')
                 data_df['AZI'] = pd.to_numeric(data_df['AZI'], errors='coerce')
                 data_df = data_df.dropna(subset=['MD'])
 
-                # Remove duplicate zeros (keep only first)
+                # Keep only first zero row if present
                 zero_mask = data_df['MD'] == 0
                 if zero_mask.sum() > 1:
                     data_df = data_df.drop(data_df[zero_mask].index[1:])
@@ -92,22 +98,28 @@ with tab_gyro:
                 data_df = data_df.reset_index(drop=True)
 
                 # Show extracted data
-                st.subheader("Extracted Gyro Data (MD, INC, AZI)")
+                st.subheader("Extracted Gyro Data")
                 st.dataframe(data_df, use_container_width=True)
 
-                # Generate PRN
+                # Generate aligned PRN (fixed-width columns)
                 prn_lines = [f"Well: {well_name}\n\n"]
+                prn_lines.append("MD    INC     AZI\n")  # header
+
                 for _, row in data_df.iterrows():
                     md = int(row['MD'])
                     inc = row['INC']
                     azi = row['AZI']
-                    prn_lines.append(f"{md} {inc:.2f} {azi:.2f}\n")
+                    # Fixed-width alignment (adjust spaces if needed)
+                    line = f"{md:>5} {inc:>7.2f} {azi:>7.2f}"
+                    prn_lines.append(line + "\n")
 
                 prn_content = "".join(prn_lines)
 
-                st.subheader("PRN Preview")
+                # Preview
+                st.subheader("PRN Preview (copy-paste ready)")
                 st.code(prn_content, language="text")
 
+                # Download
                 st.download_button(
                     label="Download Gyro PRN",
                     data=prn_content,
@@ -118,7 +130,8 @@ with tab_gyro:
 
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
-            st.info("Try checking sheet name or upload a different file.")
+            st.info("Check sheet name ('GMS') or upload again.")
+
 
 # ────────────────────────────────────────────────
 # 2. Fm Tops
