@@ -86,37 +86,56 @@ def generate_remark_png(no, remark_text, depth_in):
     image = Image.new('RGBA', (width, height), (255, 255, 255, 255))
     draw = ImageDraw.Draw(image)
 
-    # Load font (Times New Roman)
+    # Try to load Times New Roman Bold
     try:
-        font_path = "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf"  # Adjust if needed
-        base_font_size = 180  # Starting size
-        font = ImageFont.truetype(font_path, base_font_size)
-    except:
-        font = ImageFont.load_default()
-        base_font_size = 50  # Fallback
+        # Common path on many systems / Streamlit Cloud
+        font_path = "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Bold.ttf"
+        font_size = 220  # starting size - large like your example
+        font = ImageFont.truetype(font_path, font_size)
+    except Exception:
+        try:
+            # Fallback: DejaVu Serif Bold (usually available)
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", font_size)
+        except Exception:
+            font = ImageFont.load_default()
+            font_size = 80  # much smaller fallback
 
-    # Adjust font size to fit width
-    lines = wrap(remark_text, width=40)  # Approximate wrap for long text
-    text_block = "\n".join(lines)
+    # Wrap long text
+    from textwrap import wrap
+    wrapped_lines = wrap(remark_text, width=60)  # adjust number for desired line length
+    text_block = "\n".join(wrapped_lines)
+
+    # Dynamically reduce font size until it fits nicely
     while True:
-        bbox = draw.multiline_textbbox((0, 0), text_block, font=font)
+        bbox = draw.multiline_textbbox((0, 0), text_block, font=font, align="center")
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
-        if text_w <= width * 0.95 and text_h <= height * 0.95:
-            break
-        base_font_size -= 5
-        if base_font_size < 20:
-            break
-        font = ImageFont.truetype(font_path, base_font_size)
 
-    # Center text
+        if text_w <= width * 0.92 and text_h <= height * 0.88:
+            break
+
+        font_size -= 10
+        if font_size < 60:
+            break
+        font = ImageFont.truetype(font_path, font_size) if 'font_path' in locals() else font
+
+    # Center the text block
     x = (width - text_w) // 2
-    y = (height - text_h) // 2
-    draw.multiline_text((x, y), text_block, fill=(0, 0, 0, 255), font=font, align="center")
+    y = (height - text_h) // 2 - 20  # slight upward shift to match visual balance
 
-    # Set DPI and bit depth
+    # Draw bold red text
+    draw.multiline_text(
+        (x, y),
+        text_block,
+        fill=(255, 0, 0, 255),  # pure red
+        font=font,
+        align="center",
+        spacing=15  # line spacing
+    )
+
+    # Set DPI and convert to 8-bit
     image.info['dpi'] = (330, 330)
-    image = image.convert('P', palette=Image.ADAPTIVE, colors=256)  # 8-bit
+    image = image.convert('P', palette=Image.ADAPTIVE, colors=256)
 
     buf = io.BytesIO()
     image.save(buf, format="PNG", dpi=(330, 330))
