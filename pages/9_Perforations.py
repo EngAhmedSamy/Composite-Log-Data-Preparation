@@ -110,8 +110,8 @@ def generate_perforation_png(no, perf_type, depth_from, depth_to):
 
     # Load font
     try:
-        font_path = "fonts/Times_New_Roman_Bold.ttf"
-        font_size = 90  # adjust as needed
+        font_path = "Fonts/Times_New_Roman_Bold.ttf"
+        font_size = 140  # adjust as needed
         font = ImageFont.truetype(font_path, font_size)
     except:
         font = ImageFont.load_default()
