@@ -192,12 +192,160 @@ with tab_gyro:
             st.info("Check if the file is valid Excel and contains the expected data.")
 
 
+
+
+
+
+
+
+
+
 # ────────────────────────────────────────────────
 # 2. Fm Tops
 # ────────────────────────────────────────────────
 with tab_fm_tops:
     st.header("Formation Tops")
-    st.info("Formation Tops preparation coming soon. Add input form, table, export to ASCII/LAS, etc.")
+    
+    with tab_fm_tops:
+    st.header("Formation Tops")
+
+    # Predefined Fm Tops list
+    fm_tops_list = [
+        "Dabaa Fm",
+        "Apollonia Fm",
+        "Khoman Fm",
+        "Abu Roash 'A' Mbr",
+        "Abu Roash 'B' Mbr",
+        "Abu Roash 'C' Mbr",
+        "Abu Roash 'D' Mbr",
+        "Abu Roash 'E' Mbr",
+        "Abu Roash 'F' Mbr",
+        "Upper Abu Roash 'G' Mbr",
+        "Middle Abu Roash 'G' Mbr",
+        "Lower Abu Roash 'G' Mbr",
+        "Upper Bahariya Fm",
+        "Lower Bahariya Fm",
+        "Kharita Fm"
+    ]
+
+    # Data storage for selected Fm Tops (use dict for easy access)
+    if 'fm_tops_data' not in st.session_state:
+        st.session_state.fm_tops_data = {fm: {'selected': False, 'MD': 0, 'TVDSS': 0} for fm in fm_tops_list}
+
+    # Upload Excel option
+    excel_file = st.file_uploader("Upload Fm Tops Excel (optional)", type=["xlsx", "xls"])
+    if excel_file:
+        try:
+            upload_df = pd.read_excel(excel_file, sheet_name=0, header=None)
+
+            # Find well name
+            well_name = st.session_state.get('well_name', 'Unknown Well')
+            found = False
+            for i in range(len(upload_df)):
+                for j in range(len(upload_df.columns)):
+                    cell = str(upload_df.iloc[i, j]).strip().upper()
+                    if 'WELL' in cell or 'WELL NAME' in cell:
+                        if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
+                            well_name = str(upload_df.iloc[i, j+1]).strip()
+                            found = True
+                        elif i + 1 < len(upload_df) and pd.notna(upload_df.iloc[i+1, j]):
+                            well_name = str(upload_df.iloc[i+1, j]).strip()
+                            found = True
+                        if found:
+                            break
+                if found:
+                    break
+            st.session_state.well_name = well_name
+
+            # Auto-fill depths from Excel (match formation names)
+            for i in range(len(upload_df)):
+                for j in range(len(upload_df.columns)):
+                    cell = str(upload_df.iloc[i, j]).strip()
+                    if cell in fm_tops_list:
+                        # MD is in next cell (j+1), TVDSS in j+2 or parsed from comment
+                        if j + 1 < len(upload_df.columns) and pd.to_numeric(upload_df.iloc[i, j+1], errors='ignore'):
+                            md = int(upload_df.iloc[i, j+1])
+                            tvdss = 0  # default
+                            if j + 2 < len(upload_df.columns) and pd.to_numeric(upload_df.iloc[i, j+2], errors='ignore'):
+                                tvdss = int(upload_df.iloc[i, j+2])
+                            else:
+                                # Parse TVDSS from comment like "(-370 ft TVDSS)"
+                                comment = str(upload_df.iloc[i, j+2] if j+2 < len(upload_df.columns) else '')
+                                match = re.search(r'\((-?\d+)\s*ft\s*TVDSS\)', comment)
+                                if match:
+                                    tvdss = int(match.group(1))
+                            st.session_state.fm_tops_data[cell]['MD'] = md
+                            st.session_state.fm_tops_data[cell]['TVDSS'] = tvdss
+                            st.session_state.fm_tops_data[cell]['selected'] = True  # auto-select if found
+
+            st.success("Fm Tops depths auto-filled from Excel. Review and select below.")
+
+        except Exception as e:
+            st.error(f"Error reading Excel: {str(e)}")
+
+    # Input form: checkboxes + MD/TVDSS for each Fm Top
+    st.subheader("Select and Edit Fm Tops")
+    for fm in fm_tops_list:
+        selected = st.checkbox(fm, value=st.session_state.fm_tops_data[fm]['selected'], key=f"select_{fm}")
+        col_md, col_tvdss = st.columns(2)
+        with col_md:
+            md = st.number_input(
+                "MD (ft)",
+                min_value=0,
+                value=st.session_state.fm_tops_data[fm]['MD'],
+                key=f"md_{fm}"
+            )
+        with col_tvdss:
+            tvdss = st.number_input(
+                "TVDSS (ft)",
+                value=st.session_state.fm_tops_data[fm]['TVDSS'],
+                key=f"tvdss_{fm}"
+            )
+        st.session_state.fm_tops_data[fm]['selected'] = selected
+        st.session_state.fm_tops_data[fm]['MD'] = md
+        st.session_state.fm_tops_data[fm]['TVDSS'] = tvdss
+
+    # ────────────────────────────────────────────────
+    #   Preview & Download PRN
+    # ────────────────────────────────────────────────
+    st.subheader("PRN Preview & Download")
+
+    selected_tops = [fm for fm in fm_tops_list if st.session_state.fm_tops_data[fm]['selected']]
+
+    if not selected_tops:
+        st.info("No Fm Tops selected. Check boxes above to include.")
+    else:
+        well_name = st.session_state.get('well_name', 'Unknown Well')
+        prn_output = io.StringIO()
+        prn_output.write(f"Well:           {well_name}\n\n")
+
+        for fm in selected_tops:
+            md = int(st.session_state.fm_tops_data[fm]['MD'])
+            tvdss = int(st.session_state.fm_tops_data[fm]['TVDSS'])
+            # Line 1: MD-6   (MD-6 + 3)   "Fm Name"
+            prn_output.write(f"{md-6:>8} {md-6 + 3:>22} \"{fm}\"\n")
+            # Line 2: MD+5   (MD+5 + 4)   "@ MD ft (- TVDSS ft TVDSS )"
+            prn_output.write(f"{md+5:>8} {md+5 + 4:>22} \"@ {md} ft (- {tvdss} ft TVDSS )\"\n")
+
+        prn_content = prn_output.getvalue()
+
+        # Preview
+        st.code(prn_content, language="text")
+
+        # Download
+        st.download_button(
+            label="Download Fm Tops PRN",
+            data=prn_content,
+            file_name=f"({well_name}) Fm Tops.prn",
+            mime="text/plain",
+            type="primary"
+        )
+
+
+
+
+
+
 
 # ────────────────────────────────────────────────
 # 3. Mud Log (ASCII-1, ASCII-5)
