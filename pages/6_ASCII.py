@@ -25,10 +25,14 @@ with tab_gyro:
 
     if excel_file is not None:
         try:
-            # Read the Excel sheet named 'GMS' (or first sheet if name differs)
+            # Read the sheet named 'GMS' (or first sheet)
             df = pd.read_excel(excel_file, sheet_name='GMS')
 
-            # Step 1: Extract Well Name
+            # Show first few rows so user can see the data
+            st.subheader("First 20 rows of the uploaded sheet")
+            st.dataframe(df.head(20), use_container_width=True)
+
+            # Detect well name
             well_name = st.session_state.get('well_name', 'Unknown Well')
             for _, row in df.iterrows():
                 row_str = ' '.join(row.astype(str))
@@ -37,71 +41,71 @@ with tab_gyro:
                     if match:
                         well_name = match.group(1).strip()
                         break
-            st.session_state.well_name = well_name  # Update global well name
-            st.write(f"**Detected Well Name:** {well_name}")
+            st.session_state.well_name = well_name
+            st.success(f"**Well Name detected:** {well_name}")
 
-            # Step 2: Find start of numeric data (first row with valid MD)
-            data_start_idx = None
-            for idx, row in df.iterrows():
-                if pd.notna(row.iloc[0]) and str(row.iloc[0]).replace('.', '').isdigit():
-                    data_start_idx = idx
-                    break
+            # Let user specify starting row if auto-detect fails
+            st.subheader("Data extraction settings")
+            start_row = st.number_input(
+                "Start reading data from row (0-based index, usually 10–50)",
+                min_value=0,
+                value=10,
+                step=1,
+                help="Look at the table above — choose the first row with numeric MD values"
+            )
 
-            if data_start_idx is None:
-                st.error("Could not find numeric MD column in the sheet.")
-            else:
-                # Take data from the first numeric row onward
-                data_df = df.iloc[data_start_idx:, :3].copy()
-                # Assume columns: MD, INC (ANG), AZI
-                data_df.columns = ['MD', 'INC', 'AZI']
+            # Extract from user-specified row, try first 3 columns
+            data_df = df.iloc[start_row:, :3].copy()
+            data_df.columns = ['MD', 'INC', 'AZI']
 
-                # Clean: keep only rows with valid MD (numeric)
-                data_df = data_df[pd.to_numeric(data_df['MD'], errors='coerce').notnull()]
+            # Convert MD to numeric and drop rows where MD is not a number
+            data_df['MD'] = pd.to_numeric(data_df['MD'], errors='coerce')
+            data_df = data_df.dropna(subset=['MD'])
 
-                # Convert to numeric
-                data_df['MD'] = pd.to_numeric(data_df['MD'], errors='coerce')
-                data_df['INC'] = pd.to_numeric(data_df['INC'], errors='coerce')
-                data_df['AZI'] = pd.to_numeric(data_df['AZI'], errors='coerce')
+            if data_df.empty:
+                st.error("No valid numeric MD values found after the selected row.")
+                st.stop()
 
-                # Remove rows where MD == 0 except the very first one
-                zero_rows = data_df[data_df['MD'] == 0]
-                if not zero_rows.empty:
-                    first_zero = zero_rows.index[0]
-                    data_df = data_df.drop(zero_rows.index[1:])  # keep only first zero
+            # Convert other columns to numeric
+            data_df['INC'] = pd.to_numeric(data_df['INC'], errors='coerce')
+            data_df['AZI'] = pd.to_numeric(data_df['AZI'], errors='coerce')
 
-                # Reset index
-                data_df = data_df.reset_index(drop=True)
+            # Remove duplicate zeros (keep only first row if MD=0)
+            zero_mask = data_df['MD'] == 0
+            if zero_mask.sum() > 1:
+                first_zero_idx = data_df[zero_mask].index[0]
+                data_df = data_df.drop(data_df[zero_mask].index[1:])
 
-                # Preview extracted data
-                st.subheader("Extracted Gyro Data")
-                st.dataframe(data_df[['MD', 'INC', 'AZI']], use_container_width=True)
+            data_df = data_df.reset_index(drop=True)
 
-                # Generate PRN output
-                prn_lines = [f"Well: {well_name}\n"]
-                for _, row in data_df.iterrows():
-                    md = int(row['MD'])
-                    inc = row['INC']
-                    azi = row['AZI']
-                    # Format: MD ANG AZI (space delimited)
-                    prn_lines.append(f"{md} {inc:.2f} {azi:.2f}\n")
+            # Preview extracted data
+            st.subheader("Extracted Gyro Data")
+            st.dataframe(data_df[['MD', 'INC', 'AZI']], use_container_width=True)
 
-                prn_content = "".join(prn_lines)
+            # Generate PRN
+            prn_lines = [f"Well: {well_name}\n\n"]
+            for _, row in data_df.iterrows():
+                md = int(row['MD'])
+                inc = row['INC']
+                azi = row['AZI']
+                prn_lines.append(f"{md} {inc:.2f} {azi:.2f}\n")
 
-                # Preview PRN content
-                st.subheader("PRN Preview (copy-paste ready)")
-                st.code(prn_content, language="text")
+            prn_content = "".join(prn_lines)
 
-                # Download button
-                st.download_button(
-                    label="Download (Well Name) Gyro.prn",
-                    data=prn_content,
-                    file_name=f"({well_name}) Gyro.prn",
-                    mime="text/plain"
-                )
+            st.subheader("PRN Preview (copy-paste ready)")
+            st.code(prn_content, language="text")
+
+            st.download_button(
+                label="Download Gyro PRN",
+                data=prn_content,
+                file_name=f"({well_name}) Gyro.prn",
+                mime="text/plain",
+                type="primary"
+            )
 
         except Exception as e:
             st.error(f"Error reading Excel file: {str(e)}")
-            st.info("Make sure the file has a sheet named 'GMS' or adjust sheet_name in code.")
+            st.info("Make sure the file has a sheet named 'GMS'. If not, try changing sheet_name='Sheet1' in the code.")
             
 
 # ────────────────────────────────────────────────
