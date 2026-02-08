@@ -205,9 +205,6 @@ with tab_gyro:
 # ────────────────────────────────────────────────
 with tab_fm_tops:
     st.header("Formation Tops")
-    
-    with tab_fm_tops:
-    st.header("Formation Tops")
 
     # Predefined Fm Tops list
     fm_tops_list = [
@@ -340,8 +337,6 @@ with tab_fm_tops:
             mime="text/plain",
             type="primary"
         )
-
-
 
 
 
