@@ -125,7 +125,7 @@ def generate_perforation_png(no, perf_type, depth_from, depth_to):
         "Perf_015": 100,
         "Perf_020": 120,
         "Perf_025": 140,
-        "Perf_030": 50,
+        "Perf_030": 40,
         "Perf_035": 50,
         "Perf_040": 110,
         "Perf_045": 100
