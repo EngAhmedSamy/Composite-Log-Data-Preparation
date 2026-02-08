@@ -110,7 +110,7 @@ def generate_complete_loss_png(no, depth_from, depth_to):
     icon_path = "assets/Complete_Loss/Complete_Loss.png"  # uploaded to GitHub
     try:
         icon = Image.open(icon_path).convert("RGBA")
-        icon_w = 700  # adjust width # ← change this number to control icon width
+        icon_w = 800  # adjust width # ← change this number to control icon width
         icon_h = int(icon.height * icon_w / icon.width) # ← height is auto-calculated based on width
         icon = icon.resize((icon_w, icon_h), Image.LANCZOS)
         icon_x = (width - icon_w) // 2
