@@ -206,7 +206,7 @@ with tab_gyro:
 with tab_fm_tops:
     st.header("Formation Tops")
 
-    # Predefined Fm Tops list
+    # Predefined Fm Tops list (with normalized versions for matching)
     fm_tops_list = [
         "Dabaa Fm",
         "Apollonia Fm",
@@ -225,7 +225,7 @@ with tab_fm_tops:
         "Kharita Fm"
     ]
 
-    # Data storage for selected Fm Tops (use dict for easy access)
+    # Data storage
     if 'fm_tops_data' not in st.session_state:
         st.session_state.fm_tops_data = {fm: {'selected': False, 'MD': 0, 'TVDSS': 0} for fm in fm_tops_list}
 
@@ -233,7 +233,7 @@ with tab_fm_tops:
     excel_file = st.file_uploader("Upload Fm Tops Excel (optional)", type=["xlsx", "xls"])
     if excel_file:
         try:
-            upload_df = pd.read_excel(excel_file, sheet_name=0, header=None)
+            upload_df = pd.read_excel(excel_file, sheet_name=0)
 
             # Find well name
             well_name = st.session_state.get('well_name', 'Unknown Well')
@@ -254,33 +254,32 @@ with tab_fm_tops:
                     break
             st.session_state.well_name = well_name
 
-            # Auto-fill depths from Excel (match formation names)
+            # Auto-fill depths (clean cell names: strip quotes, replace " with ', add ' Mbr' for Abu Roash if missing)
+            matched = 0
             for i in range(len(upload_df)):
                 for j in range(len(upload_df.columns)):
-                    cell = str(upload_df.iloc[i, j]).strip()
+                    cell = str(upload_df.iloc[i, j]).strip().strip('"').replace('"', "'")
+                    if 'ABU ROASH' in cell.upper() and 'MBR' not in cell.upper() and "'" in cell:
+                        cell += " Mbr"  # add suffix if it looks like a member
+
                     if cell in fm_tops_list:
-                        # MD is in next cell (j+1), TVDSS in j+2 or parsed from comment
-                        if j + 1 < len(upload_df.columns) and pd.to_numeric(upload_df.iloc[i, j+1], errors='ignore'):
+                        # MD in j+1, TVDSS in j+2
+                        if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
                             md = int(upload_df.iloc[i, j+1])
-                            tvdss = 0  # default
-                            if j + 2 < len(upload_df.columns) and pd.to_numeric(upload_df.iloc[i, j+2], errors='ignore'):
+                            tvdss = 0
+                            if j + 2 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+2]):
                                 tvdss = int(upload_df.iloc[i, j+2])
-                            else:
-                                # Parse TVDSS from comment like "(-370 ft TVDSS)"
-                                comment = str(upload_df.iloc[i, j+2] if j+2 < len(upload_df.columns) else '')
-                                match = re.search(r'\((-?\d+)\s*ft\s*TVDSS\)', comment)
-                                if match:
-                                    tvdss = int(match.group(1))
                             st.session_state.fm_tops_data[cell]['MD'] = md
                             st.session_state.fm_tops_data[cell]['TVDSS'] = tvdss
-                            st.session_state.fm_tops_data[cell]['selected'] = True  # auto-select if found
+                            st.session_state.fm_tops_data[cell]['selected'] = True
+                            matched += 1
 
-            st.success("Fm Tops depths auto-filled from Excel. Review and select below.")
+            st.success(f"Matched and auto-filled {matched} Fm Tops from Excel. Review below.")
 
         except Exception as e:
             st.error(f"Error reading Excel: {str(e)}")
 
-    # Input form: checkboxes + MD/TVDSS for each Fm Top
+    # Input form: checkboxes + MD/TVDSS
     st.subheader("Select and Edit Fm Tops")
     for fm in fm_tops_list:
         selected = st.checkbox(fm, value=st.session_state.fm_tops_data[fm]['selected'], key=f"select_{fm}")
@@ -302,15 +301,15 @@ with tab_fm_tops:
         st.session_state.fm_tops_data[fm]['MD'] = md
         st.session_state.fm_tops_data[fm]['TVDSS'] = tvdss
 
-    # ────────────────────────────────────────────────
+    # ──────────────────────────────
     #   Preview & Download PRN
-    # ────────────────────────────────────────────────
+    # ──────────────────────────────
     st.subheader("PRN Preview & Download")
 
     selected_tops = [fm for fm in fm_tops_list if st.session_state.fm_tops_data[fm]['selected']]
 
     if not selected_tops:
-        st.info("No Fm Tops selected. Check boxes above to include.")
+        st.info("No Fm Tops selected. Check boxes above.")
     else:
         well_name = st.session_state.get('well_name', 'Unknown Well')
         prn_output = io.StringIO()
@@ -319,10 +318,10 @@ with tab_fm_tops:
         for fm in selected_tops:
             md = int(st.session_state.fm_tops_data[fm]['MD'])
             tvdss = int(st.session_state.fm_tops_data[fm]['TVDSS'])
-            # Line 1: MD-6   (MD-6 + 3)   "Fm Name"
-            prn_output.write(f"{md-6:>8} {md-6 + 3:>22} \"{fm}\"\n")
-            # Line 2: MD+5   (MD+5 + 4)   "@ MD ft (- TVDSS ft TVDSS )"
-            prn_output.write(f"{md+5:>8} {md+5 + 4:>22} \"@ {md} ft (- {tvdss} ft TVDSS )\"\n")
+            # Line 1: MD-6  (MD-6 + 3)  "Fm Name"
+            prn_output.write(f"{md-6:<5} {md-6 + 3:>22} \"{fm}\"\n")
+            # Line 2: MD+5  (MD+5 + 4)  "@ MD ft (- TVDSS ft TVDSS )"
+            prn_output.write(f"{md+5:<5} {md+5 + 4:>22} \"@ {md} ft (- {tvdss} ft TVDSS )\"\n")
 
         prn_content = prn_output.getvalue()
 
