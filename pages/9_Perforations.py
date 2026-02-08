@@ -117,23 +117,53 @@ def generate_perforation_png(no, perf_type, depth_from, depth_to):
         font = ImageFont.load_default()
         font_size = 60
 
+    
+# Position offsets per type (distance from top/bottom edge)
+    top_y_offsets = {
+        "Perf_005": 100,
+        "Perf_010": 300,
+        "Perf_015": 100,
+        "Perf_020": 120,
+        "Perf_025": 140,
+        "Perf_030": 160,
+        "Perf_035": 180,
+        "Perf_040": 200,
+        "Perf_045": 220
+    }
+
+    bottom_y_offsets = {
+        "Perf_005": 100,
+        "Perf_010": 300,
+        "Perf_015": 100,
+        "Perf_020": 120,
+        "Perf_025": 140,
+        "Perf_030": 160,
+        "Perf_035": 180,
+        "Perf_040": 200,
+        "Perf_045": 220
+    }
+
+    top_y = top_y_offsets.get(perf_type, 80)         # default 80 if type missing
+    bottom_y = bottom_y_offsets.get(perf_type, 80)   # default 80
+    
+    
     # Top: F/Depth From
     top_text = f"F/{int(depth_from)}"
     bbox = draw.textbbox((0, 0), top_text, font=font)
     tw = bbox[2] - bbox[0]
-    draw.text(((width - tw) // 2, 100), top_text, fill=(0, 0, 0, 255), font=font)
+    draw.text(((width - tw) // 2, top_y), top_text, fill=(0, 0, 0, 255), font=font)
 
     # Bottom: T/Depth To
     bottom_text = f"T/{int(depth_to)}"
     bbox = draw.textbbox((0, 0), bottom_text, font=font)
     tw = bbox[2] - bbox[0]
-    draw.text(((width - tw) // 2, height - 300), bottom_text, fill=(0, 0, 0, 255), font=font)
+    draw.text(((width - tw) // 2, height - bottom_y), bottom_text, fill=(0, 0, 0, 255), font=font)
 
     # Middle icon from GitHub
     icon_fname = f"{perf_type.lower()}.png"  # e.g. perf_005.png
     try:
         icon = Image.open(f"assets/Perforations/{icon_fname}").convert("RGBA")
-        icon_w = width - 100  # almost full width
+        icon_w = width - 100  # almost full width – adjust if needed
         icon_h = int(icon.height * icon_w / icon.width)
         icon = icon.resize((icon_w, icon_h), Image.LANCZOS)
         icon_x = (width - icon_w) // 2
@@ -142,7 +172,8 @@ def generate_perforation_png(no, perf_type, depth_from, depth_to):
     except Exception as e:
         st.warning(f"Icon load error: {e}")
         # Fallback black dot
-        draw.ellipse((width//2 - 20, height//2 - 20, width//2 + 20, height//2 + 20), fill=(0, 0, 0, 255))
+        # draw.ellipse((width//2 - 20, height//2 - 20, width//2 + 20, height//2 + 20), fill=(0, 0, 0, 255))
+        draw.rectangle(((width//4, height//2 - 150), (3*width//4, height//2 + 150)), outline=(255, 0, 0, 255), width=10)
 
     image.info['dpi'] = (330, 330)
     buf = io.BytesIO()
