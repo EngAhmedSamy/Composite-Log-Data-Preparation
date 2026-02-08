@@ -92,7 +92,7 @@ def generate_remark_png(no, remark_text, depth_in):
 
     try:
         # Path relative to the script (works on Streamlit Cloud)
-        font_path = "Fonts/times.ttf"
+        font_path = "Fonts/Times_New_Roman_Bold.ttf"
         font = ImageFont.truetype(font_path, font_size)
     except Exception as e:
         st.warning(f"Could not load custom font: {e}")
