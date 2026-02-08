@@ -86,54 +86,55 @@ def generate_remark_png(no, remark_text, depth_in):
     image = Image.new('RGBA', (width, height), (255, 255, 255, 255))
     draw = ImageDraw.Draw(image)
 
-    # Try to load Times New Roman Bold
+    # ─── Load font from GitHub repo folder ───
+    font = None
+    font_size = 240  # starting size
+
     try:
-        # Common path on many systems / Streamlit Cloud
-        font_path = "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Bold.ttf"
-        font_size = 220  # starting size - large like your example
+        # Path relative to the script (works on Streamlit Cloud)
+        font_path = "Fonts/times.ttf"
         font = ImageFont.truetype(font_path, font_size)
-    except Exception:
-        try:
-            # Fallback: DejaVu Serif Bold (usually available)
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", font_size)
-        except Exception:
-            font = ImageFont.load_default()
-            font_size = 80  # much smaller fallback
+    except Exception as e:
+        st.warning(f"Could not load custom font: {e}")
+        # Fallback to default (small)
+        font = ImageFont.load_default()
+        font_size = 80
 
     # Wrap long text
     from textwrap import wrap
-    wrapped_lines = wrap(remark_text, width=60)  # adjust number for desired line length
+    wrapped_lines = wrap(remark_text, width=55)  # adjust 55 to change wrap length
     text_block = "\n".join(wrapped_lines)
 
-    # Dynamically reduce font size until it fits nicely
-    while True:
+    # Reduce font size until text fits nicely
+    while font_size > 40:
         bbox = draw.multiline_textbbox((0, 0), text_block, font=font, align="center")
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
 
-        if text_w <= width * 0.92 and text_h <= height * 0.88:
+        if text_w <= width * 0.90 and text_h <= height * 0.80:
             break
 
         font_size -= 10
-        if font_size < 60:
-            break
-        font = ImageFont.truetype(font_path, font_size) if 'font_path' in locals() else font
+        try:
+            font = ImageFont.truetype(font_path, font_size)
+        except:
+            pass  # keep current font if resize fails
 
-    # Center the text block
+    # Center the text
     x = (width - text_w) // 2
-    y = (height - text_h) // 2 - 20  # slight upward shift to match visual balance
+    y = (height - text_h) // 2 - 25  # slight upward adjustment
 
-    # Draw bold red text
+    # Draw **red, bold, centered** text
     draw.multiline_text(
         (x, y),
         text_block,
-        fill=(255, 0, 0, 255),  # pure red
+        fill=(255, 0, 0, 255),  # red
         font=font,
         align="center",
-        spacing=15  # line spacing
+        spacing=18              # line spacing
     )
 
-    # Set DPI and convert to 8-bit
+    # DPI & 8-bit
     image.info['dpi'] = (330, 330)
     image = image.convert('P', palette=Image.ADAPTIVE, colors=256)
 
