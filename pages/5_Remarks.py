@@ -32,7 +32,7 @@ with col_text:
         "Remark Text (press Enter for new line)",
         value=st.session_state.remark_text,
         height=120,
-        placeholder="Add one remark\nor two remarks\n(or any multi-line text)",
+        placeholder="Add one remark\n (or any multi-line text)",
         key="remark_text_area"
     )
 
