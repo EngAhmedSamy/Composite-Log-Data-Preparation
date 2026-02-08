@@ -111,7 +111,7 @@ def generate_perforation_png(no, perf_type, depth_from, depth_to):
     # Load font
     try:
         font_path = "Fonts/Times_New_Roman_Bold.ttf"
-        font_size = 140  # adjust as needed
+        font_size = 160  # adjust as needed
         font = ImageFont.truetype(font_path, font_size)
     except:
         font = ImageFont.load_default()
@@ -121,13 +121,13 @@ def generate_perforation_png(no, perf_type, depth_from, depth_to):
     top_text = f"F/{int(depth_from)}"
     bbox = draw.textbbox((0, 0), top_text, font=font)
     tw = bbox[2] - bbox[0]
-    draw.text(((width - tw) // 2, 50), top_text, fill=(0, 0, 0, 255), font=font)
+    draw.text(((width - tw) // 2, 100), top_text, fill=(0, 0, 0, 255), font=font)
 
     # Bottom: T/Depth To
     bottom_text = f"T/{int(depth_to)}"
     bbox = draw.textbbox((0, 0), bottom_text, font=font)
     tw = bbox[2] - bbox[0]
-    draw.text(((width - tw) // 2, height - 100), bottom_text, fill=(0, 0, 0, 255), font=font)
+    draw.text(((width - tw) // 2, height - 200), bottom_text, fill=(0, 0, 0, 255), font=font)
 
     # Middle icon from GitHub
     icon_fname = f"{perf_type.lower()}.png"  # e.g. perf_005.png
