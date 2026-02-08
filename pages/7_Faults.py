@@ -197,7 +197,7 @@ with tab_comments:
         to_remove = st.multiselect(
             "Select to remove",
             options=st.session_state.fault_comments_data.index.tolist(),
-            format_func=lambda i: f"#{st.session_state.fault_comments_data.loc[i, 'No.']} – {st.session_state.fault_comments_data.loc[i, 'Comment'][:40]}... @ {st.session_state.fault_comments_data.loc[i, 'Depth In']}'")
+            format_func=lambda i: f"#{st.session_state.fault_comments_data.loc[i, 'No.']} – {st.session_state.fault_comments_data.loc[i, 'Comment'][:40]}... @ {st.session_state.fault_comments_data.loc[i, 'Depth In']}'",
             key="multiselect_fault_comments_remove"  # also give unique key to multiselect
         )
 
