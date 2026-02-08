@@ -60,23 +60,69 @@ with tab_gyro:
             # ──────────────────────────────
             # Find columns: MD (with FT below), INC (with DEG below), AZI
             # ──────────────────────────────
+            # Find column indices for MD, INC/ANG, AZI/AZ (units optional)
+            
             md_col = inc_col = azi_col = None
 
             for i in range(len(df) - 1):
-                for j in range(len(df.columns)):
-                    cell = str(df.iloc[i, j]).strip().upper()
-                    below = str(df.iloc[i+1, j]).strip().upper()
+    for j in range(len(df.columns)):
+        cell = str(df.iloc[i, j]).strip().upper()
+        below = str(df.iloc[i+1, j]).strip().upper()
 
-                    if "MD" in cell and "FT" in below:
-                        md_col = j
-                    if "INC" in cell and "DEG" in below:
-                        inc_col = j
-                    if "AZ" in cell and "DEG" in below:
-                        azi_col = j
+        # MD column: either "MD" with "FT" below, OR just "MD" (no unit required)
+        if "MD" in cell:
+            if "FT" in below or pd.isna(below) or below == '':  # unit or empty/no unit
+                md_col = j
 
-            if md_col is None or inc_col is None or azi_col is None:
-                st.error("Could not locate MD/INC/AZI columns with correct units.")
-            else:
+        # INC/ANG column: "INC" or "ANG" with "DEG" below, OR just "INC"/"ANG"
+        if ("INC" in cell or "ANG" in cell):
+            if "DEG" in below or pd.isna(below) or below == '':
+                inc_col = j
+
+        # AZI/AZ column: "AZI" or "AZ" (unit optional)
+        if "AZI" in cell or "AZ" in cell:
+            azi_col = j
+
+# Fallback: if no match with unit, look for headers alone (no unit check)
+if md_col is None:
+    for i in range(len(df)):
+        for j in range(len(df.columns)):
+            cell = str(df.iloc[i, j]).strip().upper()
+            if "MD" in cell:
+                md_col = j
+                break
+        if md_col is not None:
+            break
+
+if inc_col is None:
+    for i in range(len(df)):
+        for j in range(len(df.columns)):
+            cell = str(df.iloc[i, j]).strip().upper()
+            if "INC" in cell or "ANG" in cell:
+                inc_col = j
+                break
+        if inc_col is not None:
+            break
+
+if azi_col is None:
+    for i in range(len(df)):
+        for j in range(len(df.columns)):
+            cell = str(df.iloc[i, j]).strip().upper()
+            if "AZI" in cell or "AZ" in cell:
+                azi_col = j
+                break
+        if azi_col is not None:
+            break
+
+# Check which columns were found
+found_cols = []
+if md_col is not None: found_cols.append("MD")
+if inc_col is not None: found_cols.append("INC/ANG")
+if azi_col is not None: found_cols.append("AZI/AZ")
+
+if not found_cols:
+    st.error("Could not find any of MD, INC/ANG, or AZI/AZ columns.")
+
                 # Start reading from row after header + unit row
                 start_row = min([i for i in range(len(df)) if df.iloc[i, md_col] == df.iloc[i, md_col]]) + 2
 
