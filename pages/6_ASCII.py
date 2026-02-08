@@ -71,7 +71,7 @@ with tab_gyro:
                         md_col = j
                     if "INC" in cell and "DEG" in below:
                         inc_col = j
-                    if "AZI" in cell:
+                    if "AZI" in cell and "DEG" in below:
                         azi_col = j
 
             if md_col is None or inc_col is None or azi_col is None:
