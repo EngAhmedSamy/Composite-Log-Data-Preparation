@@ -98,7 +98,7 @@ def generate_complete_loss_png(no, depth_from, depth_to):
     top_text = f"F/{int(depth_from)}"
     bbox = draw.textbbox((0, 0), top_text, font=font)
     text_w = bbox[2] - bbox[0]
-    draw.text(((width - text_w) // 2, 100), top_text, fill=(0, 0, 0, 255), font=font) # ← 80 is distance from top
+    draw.text(((width - text_w) // 2, 80), top_text, fill=(0, 0, 0, 255), font=font) # ← 80 is distance from top
 
     # Bottom: T/Depth To
     bottom_text = f"T/{int(depth_to)}"
