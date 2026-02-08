@@ -88,23 +88,23 @@ def generate_complete_loss_png(no, depth_from, depth_to):
     # Load font (Times New Roman Bold)
     try:
         font_path = "Fonts/Times_New_Roman_Bold.ttf"  # from GitHub repo
-        font_size = 120
+        font_size = 140
         font = ImageFont.truetype(font_path, font_size)
     except:
         font = ImageFont.load_default()
-        font_size = 60
+        font_size = 80
 
     # Top: F/Depth From
     top_text = f"F/{int(depth_from)}"
     bbox = draw.textbbox((0, 0), top_text, font=font)
     text_w = bbox[2] - bbox[0]
-    draw.text(((width - text_w) // 2, 50), top_text, fill=(0, 0, 0, 255), font=font)
+    draw.text(((width - text_w) // 2, 80), top_text, fill=(0, 0, 0, 255), font=font)
 
     # Bottom: T/Depth To
     bottom_text = f"T/{int(depth_to)}"
     bbox = draw.textbbox((0, 0), bottom_text, font=font)
     text_w = bbox[2] - bbox[0]
-    draw.text(((width - text_w) // 2, height - 150), bottom_text, fill=(0, 0, 0, 255), font=font)
+    draw.text(((width - text_w) // 2, height - 180), bottom_text, fill=(0, 0, 0, 255), font=font)
 
     # Middle: Complete loss icon from GitHub
     icon_path = "assets/Complete_Loss/Complete_Loss.png"  # uploaded to GitHub
@@ -119,13 +119,15 @@ def generate_complete_loss_png(no, depth_from, depth_to):
     except Exception as e:
         st.warning(f"Icon not loaded: {e}")
         # Fallback: draw a simple red rectangle
-        draw.rectangle(((width//4, height//2 - 100), (3*width//4, height//2 + 100)), fill=(255, 0, 0, 255))
-
-    image.info['dpi'] = (150, 150)
+        draw.rectangle(((width//4, height//2 - 150), (3*width//4, height//2 + 150)), outline=(255, 0, 0, 255), width=10)
+    
+    # Set DPI to 330 and keep 32-bit (RGBA) during processing    
+    image.info['dpi'] = (330, 330)
     image = image.convert('P', palette=Image.ADAPTIVE, colors=256)  # 8-bit
 
+    # Save as PNG (preserves alpha = 32-bit)
     buf = io.BytesIO()
-    image.save(buf, format="PNG", dpi=(150, 150))
+    image.save(buf, format="PNG", dpi=(330, 330))
     buf.seek(0)
     return buf.getvalue()
 
