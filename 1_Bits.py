@@ -24,7 +24,7 @@ if st.sidebar.button("Apply Well Name", type="primary"):
         st.session_state.well_name = well_name_input.strip()
         # Place success message here - it will show until next rerun or page change
         st.sidebar.success(f"Well Name: **{st.session_state.well_name}** applied ✅")
-        st.rerun()  # optional - removes it faster but refreshes the app
+       # st.rerun()  # optional - removes it faster but refreshes the app
     else:
         st.sidebar.error("Please enter a well name")
 # Now every tab can use st.session_state.well_name
