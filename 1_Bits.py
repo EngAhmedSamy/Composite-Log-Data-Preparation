@@ -8,6 +8,22 @@ import cv2
 import pytesseract
 import re
 
+# Global well name in sidebar
+st.sidebar.header("Global Settings")
+well_name = st.sidebar.text_input(
+    "Well Name",
+    value=st.session_state.get('well_name', 'ABRAR-84')  # default value if you want
+)
+
+if st.sidebar.button("Apply Well Name"):
+    st.session_state.well_name = well_name.strip()   # .strip() removes accidental spaces
+    st.success(f"Well name set to: {st.session_state.well_name}")
+    st.rerun()
+
+# Now every tab can use st.session_state.well_name
+
+
+
 st.set_page_config(page_title="Petrel Composite Log Prep", layout="wide", page_icon="🛢️")  # optional)
                    
 st.title("Petrel Composite Log Data Preparation App")
