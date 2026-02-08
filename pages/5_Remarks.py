@@ -10,41 +10,58 @@ st.title("5 - Remarks")
 # ────────────────────────────────────────────────
 #   Data storage
 # ────────────────────────────────────────────────
+# Data storage
 if 'remarks_data' not in st.session_state:
     st.session_state.remarks_data = pd.DataFrame(columns=["No.", "Remark", "Depth In"])
 
+# Use session state keys to clear inputs after adding
+if 'remark_text' not in st.session_state:
+    st.session_state.remark_text = ""
+if 'remark_depth' not in st.session_state:
+    st.session_state.remark_depth = 0
+    
 # ────────────────────────────────────────────────
 #   Add new remark form
 # ────────────────────────────────────────────────
-st.subheader("Add new Remark")
+st.subheader("Add Remark")
 
-cols = st.columns([4, 2, 1])
-with cols[0]:
-    remark_text = st.text_input(
-        "Remark Text",
-        value="",
-        key="new_remark_text",
-        placeholder="Enter remark text here..."
+col_text, col_depth = st.columns([5, 2])
+
+with col_text:
+    remark_text = st.text_area(
+        "Remark Text (press Enter for new line)",
+        value=st.session_state.remark_text,
+        height=120,
+        placeholder="Gas Gas System System Tested Tested\n& Calibrated OK\n(or any multi-line text)",
+        key="remark_text_area"
     )
 
-with cols[1]:
+with col_depth:
     depth_in = st.number_input(
         "Depth In (ft)",
         min_value=0,
         step=1,
-        value=0,
-        key="new_remark_depth"
+        value=st.session_state.remark_depth,
+        key="remark_depth_input"
     )
 
-if st.button("➕ Add Remark", type="primary", use_container_width=True):
+if st.button("➕ Add Remark", type="primary"):
     if remark_text.strip() and depth_in >= 0:
-        next_no = int(st.session_state.remarks_data["No."].max()) + 1 if not st.session_state.remarks_data.empty else 1
+        next_no = 1 if st.session_state.remarks_data.empty else int(st.session_state.remarks_data["No."].max()) + 1
+        
         new_row = pd.DataFrame({
             "No.": [next_no],
             "Remark": [remark_text],
             "Depth In": [depth_in]
         })
-        st.session_state.remarks_data = pd.concat([st.session_state.remarks_data, new_row], ignore_index=True)
+        st.session_state.remarks_data = pd.concat(
+            [st.session_state.remarks_data, new_row],
+            ignore_index=True
+        )
+        
+        # Reset inputs
+        st.session_state.remark_text = ""
+        st.session_state.remark_depth = 0
         st.success(f"Added Remark #{next_no} @ {depth_in} ft")
         st.rerun()
     else:
@@ -67,17 +84,18 @@ else:
     to_remove = st.multiselect(
         "Select remark(s) to remove",
         options=st.session_state.remarks_data.index.tolist(),
-        format_func=lambda i: f"Remark #{st.session_state.remarks_data.loc[i, 'No.']} - {st.session_state.remarks_data.loc[i, 'Remark'][:50]}... @ {st.session_state.remarks_data.loc[i, 'Depth In']}'"
+        format_func=lambda i: f"#{st.session_state.remarks_data.loc[i, 'No.']} – {st.session_state.remarks_data.loc[i, 'Remark'][:50]}... @ {st.session_state.remarks_data.loc[i, 'Depth In']}'"
     )
 
     if st.button("🗑️ Remove selected", type="secondary"):
         if to_remove:
             st.session_state.remarks_data = st.session_state.remarks_data.drop(to_remove).reset_index(drop=True)
-            # Renumber No.
             st.session_state.remarks_data["No."] = range(1, len(st.session_state.remarks_data) + 1)
             st.success(f"Removed {len(to_remove)} remark(s)")
             st.rerun()
 
+# The rest of your code (generate_remark_png + previews/downloads) stays the same
+# ... paste your current generate_remark_png and preview/download section here ...
 # ────────────────────────────────────────────────
 #   PNG generation function
 # ────────────────────────────────────────────────
