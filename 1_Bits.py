@@ -9,15 +9,24 @@ import pytesseract
 import re
 
 # Global well name in sidebar
+# Sidebar - Global Well Name
 st.sidebar.header("Global Settings")
-well_name = st.sidebar.text_input(
+
+# Text input for well name
+well_name_input = st.sidebar.text_input(
     "Well Name",
-    value=st.session_state.get('well_name', 'ABRAR-84')  # default value if you want
+    value=st.session_state.get('well_name', 'ABRAR-84'),
+    key="well_name_input"
 )
 
-if st.sidebar.button("Apply Well Name"):
-    st.session_state.well_name = well_name.strip()   # .strip() removes accidental spaces
-    st.success(f"Well name set to: {st.session_state.well_name}")
+# Apply button
+if st.sidebar.button("Apply Well Name", type="primary"):
+    if well_name_input.strip():
+        st.session_state.well_name = well_name_input.strip()
+        # Show success message right under the button
+        st.sidebar.success(f"Well Name: **{st.session_state.well_name}** applied")
+    else:
+        st.sidebar.error("Please enter a well name")
     st.rerun()
 
 # Now every tab can use st.session_state.well_name
