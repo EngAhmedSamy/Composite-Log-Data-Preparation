@@ -26,7 +26,7 @@ with tab_gyro:
     if excel_file is not None:
         try:
             # Read without header to scan all cells
-            df = pd.read_excel(excel_file, sheet_name='GMS', header=None)
+            df = pd.read_excel(excel_file, sheet_name=0, header=None)
 
             # Show first 20 rows for reference
             st.subheader("First 20 rows of the sheet (for reference)")
