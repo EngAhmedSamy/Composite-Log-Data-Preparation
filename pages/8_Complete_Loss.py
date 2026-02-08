@@ -107,7 +107,7 @@ def generate_complete_loss_png(no, depth_from, depth_to):
     draw.text(((width - text_w) // 2, height - 150), bottom_text, fill=(0, 0, 0, 255), font=font)
 
     # Middle: Complete loss icon from GitHub
-    icon_path = "icons/complete_loss.png"  # uploaded to GitHub
+    icon_path = "assets/Complete_Loss/Complete_Loss.png"  # uploaded to GitHub
     try:
         icon = Image.open(icon_path).convert("RGBA")
         icon_w = 500  # adjust width
