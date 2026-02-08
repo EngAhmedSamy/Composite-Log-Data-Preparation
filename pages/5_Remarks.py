@@ -32,7 +32,7 @@ with col_text:
         "Remark Text (press Enter for new line)",
         value=st.session_state.remark_text,
         height=120,
-        placeholder="Gas Gas System System Tested Tested\n& Calibrated OK\n(or any multi-line text)",
+        placeholder="Add one remark\n& two remarks\n(or any multi-line text)",
         key="remark_text_area"
     )
 
