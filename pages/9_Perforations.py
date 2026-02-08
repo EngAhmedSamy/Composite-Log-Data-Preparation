@@ -127,7 +127,7 @@ def generate_perforation_png(no, perf_type, depth_from, depth_to):
     bottom_text = f"T/{int(depth_to)}"
     bbox = draw.textbbox((0, 0), bottom_text, font=font)
     tw = bbox[2] - bbox[0]
-    draw.text(((width - tw) // 2, height - 250), bottom_text, fill=(0, 0, 0, 255), font=font)
+    draw.text(((width - tw) // 2, height - 300), bottom_text, fill=(0, 0, 0, 255), font=font)
 
     # Middle icon from GitHub
     icon_fname = f"{perf_type.lower()}.png"  # e.g. perf_005.png
