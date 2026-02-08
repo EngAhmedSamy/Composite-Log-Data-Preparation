@@ -35,7 +35,7 @@ with col_text:
         "Remark Text (press Enter for new line)",
         value=st.session_state.get('remark_text', ""),
         height=140,                     # taller area for comfort
-        placeholder="Gas Gas System System Tested Tested\n& Calibrated OK\n(or any multiline text)",
+        placeholder="Gas System Tested\n& Calibrated OK\n(or any multiline text)",
         key="remark_text_area"
     )
 
