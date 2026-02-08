@@ -23,6 +23,9 @@ if 'remark_depth' not in st.session_state:
 # ────────────────────────────────────────────────
 #   Add new remark form
 # ────────────────────────────────────────────────
+# ... (keep all previous imports and data storage code) ...
+
+# Add new remark form
 st.subheader("Add Remark")
 
 col_text, col_depth = st.columns([5, 2])
@@ -30,9 +33,9 @@ col_text, col_depth = st.columns([5, 2])
 with col_text:
     remark_text = st.text_area(
         "Remark Text (press Enter for new line)",
-        value=st.session_state.remark_text,
-        height=120,
-        placeholder="Add one remark\n (or any multi-line text)",
+        value=st.session_state.get('remark_text', ""),
+        height=140,                     # taller area for comfort
+        placeholder="Gas Gas System System Tested Tested\n& Calibrated OK\n(or any multiline text)",
         key="remark_text_area"
     )
 
@@ -41,7 +44,7 @@ with col_depth:
         "Depth In (ft)",
         min_value=0,
         step=1,
-        value=st.session_state.remark_depth,
+        value=st.session_state.get('remark_depth', 0),
         key="remark_depth_input"
     )
 
@@ -51,7 +54,7 @@ if st.button("➕ Add Remark", type="primary"):
         
         new_row = pd.DataFrame({
             "No.": [next_no],
-            "Remark": [remark_text],
+            "Remark": [remark_text],          # ← keep original newlines
             "Depth In": [depth_in]
         })
         st.session_state.remarks_data = pd.concat(
@@ -66,6 +69,8 @@ if st.button("➕ Add Remark", type="primary"):
         st.rerun()
     else:
         st.warning("Please enter remark text and depth")
+
+# ... (keep the current entries table and remove logic) ...
 
 # ────────────────────────────────────────────────
 #   Current entries + delete
@@ -99,31 +104,24 @@ else:
 # ────────────────────────────────────────────────
 #   PNG generation function
 # ────────────────────────────────────────────────
+# Updated PNG generation – preserves line breaks
 def generate_remark_png(no, remark_text, depth_in):
     width, height = 3449, 792
     image = Image.new('RGBA', (width, height), (255, 255, 255, 255))
     draw = ImageDraw.Draw(image)
 
-    # ─── Load font from GitHub repo folder ───
-    font = None
-    font_size = 240  # starting size
-
+    # Load font (DejaVu fallback – reliable on cloud)
     try:
-        # Path relative to the script (works on Streamlit Cloud)
-        font_path = "Fonts/Times_New_Roman_Bold.ttf"
-        font = ImageFont.truetype(font_path, font_size)
-    except Exception as e:
-        st.warning(f"Could not load custom font: {e}")
-        # Fallback to default (small)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", 220)
+    except:
         font = ImageFont.load_default()
-        font_size = 80
 
-    # Wrap long text
-    from textwrap import wrap
-    wrapped_lines = wrap(remark_text, width=55)  # adjust 55 to change wrap length
-    text_block = "\n".join(wrapped_lines)
+    # Use the raw text with \n preserved – no extra wrapping needed
+    # (you can still add manual \n by pressing Enter)
+    text_block = remark_text
 
-    # Reduce font size until text fits nicely
+    # Dynamically reduce font size if needed
+    font_size = 220
     while font_size > 40:
         bbox = draw.multiline_textbbox((0, 0), text_block, font=font, align="center")
         text_w = bbox[2] - bbox[0]
@@ -134,25 +132,24 @@ def generate_remark_png(no, remark_text, depth_in):
 
         font_size -= 10
         try:
-            font = ImageFont.truetype(font_path, font_size)
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf", font_size)
         except:
-            pass  # keep current font if resize fails
+            pass
 
-    # Center the text
+    # Center
     x = (width - text_w) // 2
-    y = (height - text_h) // 2 - 25  # slight upward adjustment
+    y = (height - text_h) // 2 - 20  # slight upward shift
 
-    # Draw **red, bold, centered** text
+    # Draw red, bold, multiline text
     draw.multiline_text(
         (x, y),
         text_block,
         fill=(255, 0, 0, 255),  # red
         font=font,
         align="center",
-        spacing=18              # line spacing
+        spacing=20              # controls vertical spacing between lines
     )
 
-    # DPI & 8-bit
     image.info['dpi'] = (330, 330)
     image = image.convert('P', palette=Image.ADAPTIVE, colors=256)
 
@@ -160,6 +157,8 @@ def generate_remark_png(no, remark_text, depth_in):
     image.save(buf, format="PNG", dpi=(330, 330))
     buf.seek(0)
     return buf.getvalue()
+
+# ... (keep the rest: previews, downloads, ZIP, etc.) ...
 
 # ────────────────────────────────────────────────
 #   Previews & Downloads
