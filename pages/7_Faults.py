@@ -219,7 +219,7 @@ with tab_comments:
         for _, row in st.session_state.fault_comments_data.iterrows():
             depth = int(row["Depth In"])
             comment = row["Comment"]
-            line = f"{depth - 5} {depth + 5} \" {comment} \\n\""
+            line = f"{depth - 5} {depth + 5} \"{comment}\\n\""
             output.write(line + "\n")
 
         # Preview
