@@ -88,7 +88,7 @@ def generate_complete_loss_png(no, depth_from, depth_to):
     # Load font (Times New Roman Bold)
     try:
         font_path = "Fonts/Times_New_Roman_Bold.ttf"  # from GitHub repo
-        font_size = 140
+        font_size = 140      # ← starting font size for depth text
         font = ImageFont.truetype(font_path, font_size)
     except:
         font = ImageFont.load_default()
@@ -98,20 +98,20 @@ def generate_complete_loss_png(no, depth_from, depth_to):
     top_text = f"F/{int(depth_from)}"
     bbox = draw.textbbox((0, 0), top_text, font=font)
     text_w = bbox[2] - bbox[0]
-    draw.text(((width - text_w) // 2, 80), top_text, fill=(0, 0, 0, 255), font=font)
+    draw.text(((width - text_w) // 2, 100), top_text, fill=(0, 0, 0, 255), font=font) # ← 80 is distance from top
 
     # Bottom: T/Depth To
     bottom_text = f"T/{int(depth_to)}"
     bbox = draw.textbbox((0, 0), bottom_text, font=font)
     text_w = bbox[2] - bbox[0]
-    draw.text(((width - text_w) // 2, height - 180), bottom_text, fill=(0, 0, 0, 255), font=font)
+    draw.text(((width - text_w) // 2, height - 160), bottom_text, fill=(0, 0, 0, 255), font=font) # ← 180 is distance from bottom
 
     # Middle: Complete loss icon from GitHub
     icon_path = "assets/Complete_Loss/Complete_Loss.png"  # uploaded to GitHub
     try:
         icon = Image.open(icon_path).convert("RGBA")
-        icon_w = 500  # adjust width
-        icon_h = int(icon.height * icon_w / icon.width)
+        icon_w = 700  # adjust width # ← change this number to control icon width
+        icon_h = int(icon.height * icon_w / icon.width) # ← height is auto-calculated based on width
         icon = icon.resize((icon_w, icon_h), Image.LANCZOS)
         icon_x = (width - icon_w) // 2
         icon_y = (height - icon_h) // 2
