@@ -25,7 +25,7 @@ with tab_gyro:
 
     if excel_file is not None:
         try:
-            # Read without header to scan all cells
+            # Read the FIRST sheet (index 0), no header to scan all cells
             df = pd.read_excel(excel_file, sheet_name=0, header=None)
 
             # Show first 20 rows for reference
@@ -36,110 +36,116 @@ with tab_gyro:
             # Find Well Name (search all cells, look right or below)
             # ──────────────────────────────
             well_name = st.session_state.get('well_name', 'Unknown Well')
-            found = False
+            found_well = False
             for i in range(len(df)):
                 for j in range(len(df.columns)):
                     cell = str(df.iloc[i, j]).strip().upper()
-                    if 'WELL NAME' in cell or 'WELL' in cell:
-                        # Look right (same row, next cell)
+                    if 'WELL' in cell or 'WELL NAME' in cell:
+                        # Try right (same row, next cell)
                         if j + 1 < len(df.columns) and pd.notna(df.iloc[i, j+1]):
                             well_name = str(df.iloc[i, j+1]).strip()
-                            found = True
-                        # Look below (next row, same column)
+                            found_well = True
+                        # Try below (next row, same column)
                         elif i + 1 < len(df) and pd.notna(df.iloc[i+1, j]):
                             well_name = str(df.iloc[i+1, j]).strip()
-                            found = True
-                        if found:
+                            found_well = True
+                        if found_well:
                             break
-                if found:
+                if found_well:
                     break
 
             st.session_state.well_name = well_name
             st.success(f"**Well Name:** {well_name}")
 
             # ──────────────────────────────
-            # Find columns: MD (with FT below), INC (with DEG below), AZI
+            # Find columns: MD, INC/ANG, AZI/AZ (flexible: header + unit or header only)
             # ──────────────────────────────
+            md_col = inc_col = azi_col = None
 
-# Step 2: Find column indices for MD, INC/ANG, AZI/AZ (flexible: header + unit or header only)
-md_col = inc_col = azi_col = None
+            for i in range(len(df) - 1):
+                for j in range(len(df.columns)):
+                    cell = str(df.iloc[i, j]).strip().upper()
+                    below = str(df.iloc[i+1, j]).strip().upper()
 
-for i in range(len(df) - 1):
-    for j in range(len(df.columns)):
-        cell = str(df.iloc[i, j]).strip().upper()
-        below = str(df.iloc[i+1, j]).strip().upper()
+                    # MD column
+                    if "MD" in cell:
+                        if "FT" in below or pd.isna(below) or below == '':
+                            md_col = j
 
-        # MD column: either "MD" with "FT" below, OR just "MD" (no unit required)
-        if "MD" in cell:
-            if "FT" in below or pd.isna(below) or below == '':  # unit or empty/no unit
-                md_col = j
+                    # INC/ANG column
+                    if ("INC" in cell or "ANG" in cell):
+                        if "DEG" in below or pd.isna(below) or below == '':
+                            inc_col = j
 
-        # INC/ANG column: "INC" or "ANG" with "DEG" below, OR just "INC"/"ANG"
-        if ("INC" in cell or "ANG" in cell):
-            if "DEG" in below or pd.isna(below) or below == '':
-                inc_col = j
+                    # AZI/AZ column
+                    if "AZI" in cell or "AZ" in cell:
+                        azi_col = j
 
-        # AZI/AZ column: "AZI" or "AZ" (unit optional)
-        if "AZI" in cell or "AZ" in cell:
-            azi_col = j
+            # Fallback: if no match with unit, look for headers alone
+            if md_col is None:
+                for i in range(len(df)):
+                    for j in range(len(df.columns)):
+                        cell = str(df.iloc[i, j]).strip().upper()
+                        if "MD" in cell:
+                            md_col = j
+                            break
+                    if md_col is not None:
+                        break
 
-# Fallback: if no match with unit, look for headers alone (no unit check)
-if md_col is None:
-    for i in range(len(df)):
-        for j in range(len(df.columns)):
-            cell = str(df.iloc[i, j]).strip().upper()
-            if "MD" in cell:
-                md_col = j
-                break
-        if md_col is not None:
-            break
+            if inc_col is None:
+                for i in range(len(df)):
+                    for j in range(len(df.columns)):
+                        cell = str(df.iloc[i, j]).strip().upper()
+                        if "INC" in cell or "ANG" in cell:
+                            inc_col = j
+                            break
+                    if inc_col is not None:
+                        break
 
-if inc_col is None:
-    for i in range(len(df)):
-        for j in range(len(df.columns)):
-            cell = str(df.iloc[i, j]).strip().upper()
-            if "INC" in cell or "ANG" in cell:
-                inc_col = j
-                break
-        if inc_col is not None:
-            break
+            if azi_col is None:
+                for i in range(len(df)):
+                    for j in range(len(df.columns)):
+                        cell = str(df.iloc[i, j]).strip().upper()
+                        if "AZI" in cell or "AZ" in cell:
+                            azi_col = j
+                            break
+                    if azi_col is not None:
+                        break
 
-if azi_col is None:
-    for i in range(len(df)):
-        for j in range(len(df.columns)):
-            cell = str(df.iloc[i, j]).strip().upper()
-            if "AZI" in cell or "AZ" in cell:
-                azi_col = j
-                break
-        if azi_col is not None:
-            break
+            # Check which columns were found
+            found_cols = []
+            if md_col is not None: found_cols.append("MD")
+            if inc_col is not None: found_cols.append("INC/ANG")
+            if azi_col is not None: found_cols.append("AZI/AZ")
 
-# Check which columns were found
-found_cols = []
-if md_col is not None: found_cols.append("MD")
-if inc_col is not None: found_cols.append("INC/ANG")
-if azi_col is not None: found_cols.append("AZI/AZ")
+            if not found_cols:
+                st.error("Could not find any of MD, INC/ANG, or AZI/AZ columns.")
+            else:
+                st.info(f"Found columns: {', '.join(found_cols)}")
 
-if not found_cols:
-    st.error("Could not find any of MD, INC/ANG, or AZI/AZ columns.")
-else:
-    st.info(f"Found columns: {', '.join(found_cols)}")
+                # Data starts after header + unit row (or after header if no unit)
+                start_row = 0
+                for i in range(len(df)):
+                    if any(pd.notna(df.iloc[i, c]) for c in [md_col, inc_col, azi_col] if c is not None):
+                        start_row = i + 2  # skip header and unit
+                        break
 
+                # Extract available columns
+                cols_to_take = []
+                if md_col is not None: cols_to_take.append(md_col)
+                if inc_col is not None: cols_to_take.append(inc_col)
+                if azi_col is not None: cols_to_take.append(azi_col)
 
-                # Start reading from row after header + unit row
-                start_row = min([i for i in range(len(df)) if df.iloc[i, md_col] == df.iloc[i, md_col]]) + 2
+                data_df = df.iloc[start_row:, cols_to_take].copy()
+                data_df.columns = ['MD' if c == md_col else 'INC' if c == inc_col else 'AZI' for c in cols_to_take]
 
-                # Extract the three columns
-                data_df = df.iloc[start_row:, [md_col, inc_col, azi_col]].copy()
-                data_df.columns = ['MD', 'INC', 'AZI']
+                # Clean
+                for col in data_df.columns:
+                    data_df[col] = pd.to_numeric(data_df[col], errors='coerce')
 
-                # Clean: convert numeric, drop invalid
-                data_df['MD'] = pd.to_numeric(data_df['MD'], errors='coerce')
-                data_df['INC'] = pd.to_numeric(data_df['INC'], errors='coerce')
-                data_df['AZI'] = pd.to_numeric(data_df['AZI'], errors='coerce')
                 data_df = data_df.dropna(subset=['MD'])
 
-                # Keep only first zero row if present
+                # Keep only first zero row
                 zero_mask = data_df['MD'] == 0
                 if zero_mask.sum() > 1:
                     data_df = data_df.drop(data_df[zero_mask].index[1:])
@@ -150,25 +156,29 @@ else:
                 st.subheader("Extracted Gyro Data")
                 st.dataframe(data_df, use_container_width=True)
 
-                # Generate aligned PRN (fixed-width columns)
+                # Generate aligned PRN
                 prn_lines = [f"Well: {well_name}\n\n"]
-                prn_lines.append("MD    INC     AZI\n")  # header
+                header = "MD"
+                if 'INC' in data_df.columns:
+                    header += "   INC"
+                if 'AZI' in data_df.columns:
+                    header += "   AZI"
+                prn_lines.append(header + "\n")
 
                 for _, row in data_df.iterrows():
                     md = int(row['MD'])
-                    inc = row['INC']
-                    azi = row['AZI']
-                    # Fixed-width alignment (adjust spaces if needed)
-                    line = f"{md:>5} {inc:>7.2f} {azi:>9.2f}"
+                    line = f"{md:>5}"
+                    if 'INC' in data_df.columns:
+                        line += f" {row['INC']:>7.2f}"
+                    if 'AZI' in data_df.columns:
+                        line += f" {row['AZI']:>7.2f}"
                     prn_lines.append(line + "\n")
 
                 prn_content = "".join(prn_lines)
 
-                # Preview
                 st.subheader("PRN Preview (copy-paste ready)")
                 st.code(prn_content, language="text")
 
-                # Download
                 st.download_button(
                     label="Download Gyro PRN",
                     data=prn_content,
@@ -179,7 +189,7 @@ else:
 
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
-            st.info("Check sheet name ('GMS') or upload again.")
+            st.info("Check if the file is valid Excel and contains the expected data.")
 
 
 # ────────────────────────────────────────────────
