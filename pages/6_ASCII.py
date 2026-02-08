@@ -60,11 +60,10 @@ with tab_gyro:
             # ──────────────────────────────
             # Find columns: MD (with FT below), INC (with DEG below), AZI
             # ──────────────────────────────
-            # Find column indices for MD, INC/ANG, AZI/AZ (units optional)
-            
-            md_col = inc_col = azi_col = None
+                 # Step 2: Find column indices for MD, INC/ANG, AZI/AZ (flexible: header + unit or header only)
+md_col = inc_col = azi_col = None
 
-            for i in range(len(df) - 1):
+for i in range(len(df) - 1):
     for j in range(len(df.columns)):
         cell = str(df.iloc[i, j]).strip().upper()
         below = str(df.iloc[i+1, j]).strip().upper()
@@ -122,6 +121,8 @@ if azi_col is not None: found_cols.append("AZI/AZ")
 
 if not found_cols:
     st.error("Could not find any of MD, INC/ANG, or AZI/AZ columns.")
+else:
+    st.info(f"Found columns: {', '.join(found_cols)}")
 
                 # Start reading from row after header + unit row
                 start_row = min([i for i in range(len(df)) if df.iloc[i, md_col] == df.iloc[i, md_col]]) + 2
