@@ -197,10 +197,11 @@ with tab_comments:
         to_remove = st.multiselect(
             "Select to remove",
             options=st.session_state.fault_comments_data.index.tolist(),
-            format_func=lambda i: f"#{st.session_state.fault_comments_data.loc[i, 'No.']} – {st.session_state.fault_comments_data.loc[i, 'Comment'][:40]}... @ {st.session_state.fault_comments_data.loc[i, 'Depth In']}'"
+            format_func=lambda i: f"#{st.session_state.fault_comments_data.loc[i, 'No.']} – {st.session_state.fault_comments_data.loc[i, 'Comment'][:40]}... @ {st.session_state.fault_comments_data.loc[i, 'Depth In']}'")
+            key="multiselect_fault_comments_remove"  # also give unique key to multiselect
         )
 
-        if st.button("🗑️ Remove selected", type="secondary"):
+        if st.button("🗑️ Remove selected", type="secondary", key="btn_remove_fault_comments"):
             if to_remove:
                 st.session_state.fault_comments_data = st.session_state.fault_comments_data.drop(to_remove).reset_index(drop=True)
                 st.session_state.fault_comments_data["No."] = range(1, len(st.session_state.fault_comments_data) + 1)
