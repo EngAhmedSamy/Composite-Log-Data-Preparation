@@ -125,10 +125,10 @@ def generate_perforation_png(no, perf_type, depth_from, depth_to):
         "Perf_015": 100,
         "Perf_020": 120,
         "Perf_025": 140,
-        "Perf_030": 100,
-        "Perf_035": 100,
+        "Perf_030": 80,
+        "Perf_035": 80,
         "Perf_040": 110,
-        "Perf_045": 120
+        "Perf_045": 110
     }
 
     bottom_y_offsets = {
