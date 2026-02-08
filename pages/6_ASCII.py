@@ -110,7 +110,7 @@ with tab_gyro:
                     inc = row['INC']
                     azi = row['AZI']
                     # Fixed-width alignment (adjust spaces if needed)
-                    line = f"{md:>5} {inc:>7.2f} {azi:>7.2f}"
+                    line = f"{md:>5} {inc:>7.2f} {azi:>9.2f}"
                     prn_lines.append(line + "\n")
 
                 prn_content = "".join(prn_lines)
