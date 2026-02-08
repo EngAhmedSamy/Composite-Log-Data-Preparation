@@ -121,25 +121,25 @@ def generate_perforation_png(no, perf_type, depth_from, depth_to):
 # Position offsets per type (distance from top/bottom edge)
     top_y_offsets = {
         "Perf_005": 100,
-        "Perf_010": 300,
+        "Perf_010": 100,
         "Perf_015": 100,
         "Perf_020": 120,
         "Perf_025": 140,
-        "Perf_030": 160,
-        "Perf_035": 180,
-        "Perf_040": 200,
-        "Perf_045": 220
+        "Perf_030": 100,
+        "Perf_035": 100,
+        "Perf_040": 110,
+        "Perf_045": 120
     }
 
     bottom_y_offsets = {
-        "Perf_005": 100,
+        "Perf_005": 300,
         "Perf_010": 300,
-        "Perf_015": 100,
-        "Perf_020": 120,
-        "Perf_025": 140,
-        "Perf_030": 160,
-        "Perf_035": 180,
-        "Perf_040": 200,
+        "Perf_015": 300,
+        "Perf_020": 320,
+        "Perf_025": 340,
+        "Perf_030": 165,
+        "Perf_035": 185,
+        "Perf_040": 210,
         "Perf_045": 220
     }
 
