@@ -88,7 +88,7 @@ def generate_complete_loss_png(no, depth_from, depth_to):
     # Load font (Times New Roman Bold)
     try:
         font_path = "Fonts/Times_New_Roman_Bold.ttf"  # from GitHub repo
-        font_size = 140      # ← starting font size for depth text
+        font_size = 200      # ← starting font size for depth text
         font = ImageFont.truetype(font_path, font_size)
     except:
         font = ImageFont.load_default()
