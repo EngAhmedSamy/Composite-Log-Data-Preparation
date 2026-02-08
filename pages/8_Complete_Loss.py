@@ -104,7 +104,7 @@ def generate_complete_loss_png(no, depth_from, depth_to):
     bottom_text = f"T/{int(depth_to)}"
     bbox = draw.textbbox((0, 0), bottom_text, font=font)
     text_w = bbox[2] - bbox[0]
-    draw.text(((width - text_w) // 2, height - 140), bottom_text, fill=(0, 0, 0, 255), font=font) # ← 180 is distance from bottom
+    draw.text(((width - text_w) // 2, height - 200), bottom_text, fill=(0, 0, 0, 255), font=font) # ← 180 is distance from bottom
 
     # Middle: Complete loss icon from GitHub
     icon_path = "assets/Complete_Loss/Complete_Loss.png"  # uploaded to GitHub
