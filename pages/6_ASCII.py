@@ -385,6 +385,7 @@ import streamlit as st
 import pandas as pd
 import io
 import zipfile
+import math
 
 st.title("Mud Log ASCII-1 and ASCII-5 Generator")
 
@@ -400,12 +401,12 @@ if uploaded_file is not None:
 
     # ─── Try modern .xlsx first ──────────────────────────────────────────────
     try:
-        wb = pd.ExcelFile(io.BytesIO(file_bytes), engine='openpyxl')
+        wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="openpyxl")
         sheet_names = wb.sheet_names
         st.success("Loaded as modern .xlsx")
     except Exception:
         try:
-            wb = pd.ExcelFile(io.BytesIO(file_bytes), engine='xlrd')
+            wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="xlrd")
             sheet_names = wb.sheet_names
             st.warning("Loaded as legacy .xls (Excel 97-2003 format)")
         except Exception as e:
@@ -477,7 +478,7 @@ if uploaded_file is not None:
             data_start = header_row_idx + 2
             df_data = df_drlg1.iloc[data_start:].copy()
 
-            # Try to find column indices
+            # Find column indices
             cols = df_drlg1.iloc[header_row_idx].astype(str).str.upper().str.strip()
             depth_col = None
             wob_col   = None
@@ -492,24 +493,29 @@ if uploaded_file is not None:
                     rpm_col = j
 
             if depth_col is not None and wob_col is not None and rpm_col is not None:
-                prn1_lines = [f"Well: {well_name} MD WOB RPM"]
+                data = []
                 for _, row in df_data.iterrows():
-                    try:
-                        d = float(row.iloc[depth_col])
-                        w = float(row.iloc[wob_col]) if pd.notna(row.iloc[wob_col]) else 0.0
-                        r = float(row.iloc[rpm_col]) if pd.notna(row.iloc[rpm_col]) else 0.0
-                        prn1_lines.append(f"{d:.0f} {w:.0f} {r:.0f}")
-                    except (ValueError, TypeError):
-                        continue  # skip invalid rows
+                    md_v = row.iloc[depth_col]
+                    w_v = row.iloc[wob_col]
+                    r_v = row.iloc[rpm_col]
+                    if pd.notna(md_v) and md_v != '':
+                        try:
+                            d = float(md_v)
+                            w = float(w_v) if pd.notna(w_v) and w_v != '' else 0.0
+                            if math.isnan(w): w = 0.0
+                            r = float(r_v) if pd.notna(r_v) and r_v != '' else 0.0
+                            if math.isnan(r): r = 0.0
+                            data.append((d, w, r))
+                        except (ValueError, TypeError):
+                            continue
 
-                if len(prn1_lines) > 1:
-                    prn1_content = "\n".join(prn1_lines) + "\n"
+                if data:
+                    prn1_content = f" Well:  {well_name}\n   MD     WOB     RPM\n" + "\n".join(f"   {int(d)}      {int(w)}       {int(r)}" for d, w, r in data) + "\n"
                     st.subheader("ASCII 1 Preview (first 20 lines)")
-                    st.text("\n".join(prn1_lines[:21]))
-                else:
-                    st.warning("No valid numeric data found in DRLG 1")
+                    preview_lines = prn1_content.split("\n")[:20]
+                    st.text("\n".join(preview_lines))
 
-    # ─── Process ASCII 5 (MD, ROP1, TG, C1–C5) ───────────────────────────────
+    # ─── Process ASCII 5 (MD, ROP, TG, C1–C5) ───────────────────────────────
     prn5_content = None
     if df_gas5 is not None:
         header_row_idx = None
@@ -530,77 +536,49 @@ if uploaded_file is not None:
             tg_col    = next((j for j, v in enumerate(cols) if "TG" in v or "T_GAS" in v), None)
 
             gas_cols = []
-            for name in ["C1", "C2", "C3", "C4I", "C4N", "C5", "IC4", "NC4"]:
+            for name in ["C1", "C2", "C3", "IC4", "NC4", "C5", "C4I", "C4N"]:
                 idx = next((j for j, v in enumerate(cols) if name in v), None)
                 if idx is not None:
                     gas_cols.append((name, idx))
 
-            if depth_col is not None and rop_col is not None and tg_col is not None and len(gas_cols) >= 5:
-                header = f"Well: {well_name} MD ROP TG " + " ".join(n for n, _ in gas_cols)
-                prn5_lines = [header]
-
+            # Assume order C1 C2 C3 C4I C4N C5
+            if depth_col is not None and rop_col is not None and tg_col is not None and len(gas_cols) >= 6:
+                data = []
                 for _, row in df_data.iterrows():
-                    try:
-                        values = []
-                        values.append(float(row.iloc[depth_col]))
-                        values.append(float(row.iloc[rop_col]))
-                        values.append(float(row.iloc[tg_col]))
-                        for _, idx in gas_cols:
-                            v = row.iloc[idx]
-                            values.append(float(v) if pd.notna(v) else 0.0)
-                        prn5_lines.append(" ".join(f"{v:.0f}" if i > 0 else f"{v:.1f}" for i, v in enumerate(values)))
-                    except (ValueError, TypeError):
-                        continue
+                    values = []
+                    md_v = row.iloc[depth_col]
+                    if pd.notna(md_v) and md_v != '':
+                        try:
+                            values.append(float(md_v))
+                            rop_v = row.iloc[rop_col]
+                            rop = float(rop_v) if pd.notna(rop_v) and rop_v != '' else 0.0
+                            if math.isnan(rop): rop = 0.0
+                            values.append(rop)
+                            tg_v = row.iloc[tg_col]
+                            tg = float(tg_v) if pd.notna(tg_v) and tg_v != '' else 0.0
+                            if math.isnan(tg): tg = 0.0
+                            values.append(tg)
+                            for _, idx in gas_cols[:6]:  # take first 6
+                                v = row.iloc[idx]
+                                vv = float(v) if pd.notna(v) and v != '' else 0.0
+                                if math.isnan(vv): vv = 0.0
+                                values.append(vv)
+                            data.append(values)
+                        except (ValueError, TypeError):
+                            continue
 
-                if len(prn5_lines) > 1:
-                    prn5_content = "\n".join(prn5_lines) + "\n"
+                if data:
+                    prn5_content = f" Well:           {well_name}\n   MD     ROP      TG      C1      C2      C3     C4I     C4N      C5\n" + "\n".join(f"   {int(v[0])}    {v[1]:.1f}     {int(v[2])}       {int(v[3])}       {int(v[4])}       {int(v[5])}       {int(v[6])}       {int(v[7])}       {int(v[8])}" for v in data) + "\n"
                     st.subheader("ASCII 5 Preview (first 20 lines)")
-                    st.text("\n".join(prn5_lines[:21]))
-                else:
-                    st.warning("No valid numeric data found in GAS 5")
+                    preview_lines = prn5_content.split("\n")[:20]
+                    st.text("\n".join(preview_lines))
 
-   # Previews
-    if prn1_content:
-        st.subheader("Preview ASCII 1")
-        st.text(prn1_content[:2000] + "..." if len(prn1_content) > 2000 else prn1_content)
-        st.download_button(
-            label="Download ASCII 1 .prn",
-            data=prn1_content,
-            file_name=f"{well_name} Mud Log Ascii 1.prn",
-            mime="text/plain"
-        )
-    
-    if prn5_content:
-        st.subheader("Preview ASCII 5")
-        st.text(prn5_content[:2000] + "..." if len(prn5_content) > 2000 else prn5_content)
-        st.download_button(
-            label="Download ASCII 5 .prn",
-            data=prn5_content,
-            file_name=f"{well_name} Mud Log Ascii 5.prn",
-            mime="text/plain"
-        )
-    
-    if prn1_content and prn5_content:
-        # Create ZIP (as RAR requires additional libs, using ZIP instead)
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w") as zf:
-            zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
-            zf.writestr(f"{well_name} Mud Log Ascii 5.prn", prn5_content)
-        zip_buffer.seek(0)
-        st.download_button(
-            label="Download Both in ZIP (RAR alternative)",
-            data=zip_buffer,
-            file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
-            mime="application/zip"
-        )
-    
-    
     # ─── Download buttons ────────────────────────────────────────────────────
     if prn1_content:
         st.download_button(
             "Download ASCII 1 .prn",
             prn1_content,
-            file_name=f"{well_name}_Mud_Log_Ascii_1.prn",
+            file_name=f"{well_name} Mud Log Ascii 1.prn",
             mime="text/plain"
         )
 
@@ -608,20 +586,20 @@ if uploaded_file is not None:
         st.download_button(
             "Download ASCII 5 .prn",
             prn5_content,
-            file_name=f"{well_name}_Mud_Log_Ascii_5.prn",
+            file_name=f"{well_name} Mud Log Ascii 5.prn",
             mime="text/plain"
         )
 
     if prn1_content and prn5_content:
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr(f"{well_name}_Mud_Log_Ascii_1.prn", prn1_content)
-            zf.writestr(f"{well_name}_Mud_Log_Ascii_5.prn", prn5_content)
+            zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
+            zf.writestr(f"{well_name} Mud Log Ascii 5.prn", prn5_content)
         zip_buffer.seek(0)
         st.download_button(
             "Download Both (ZIP)",
             zip_buffer,
-            file_name=f"{well_name}_Mud_Log_Ascii_1_&_5.zip",
+            file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
             mime="application/zip"
         )
 
