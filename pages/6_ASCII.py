@@ -292,20 +292,22 @@ with tab_fm_tops:
     # Input form: checkboxes + MD/TVDSS for each Fm Top
     st.subheader("Select and Edit Fm Tops")
     for fm in fm_tops_list:
-        selected = st.checkbox(fm, value=st.session_state.fm_tops_data[fm]['selected'], key=f"select_{fm}")
+        # Use a dynamic key that changes when upload happens
+        upload_key = st.session_state.get('last_excel_name', 'no_upload')
+        selected = st.checkbox(fm, value=st.session_state.fm_tops_data[fm]['selected'], key=f"select_{fm}_{upload_key}")
         col_md, col_tvdss = st.columns(2)
         with col_md:
             md = st.number_input(
                 "MD (ft)",
                 min_value=0,
                 value=st.session_state.fm_tops_data[fm]['MD'],
-                key=f"md_{fm}"
+                key=f"md_{fm}_{upload_key}"
             )
         with col_tvdss:
             tvdss = st.number_input(
                 "TVDSS (ft)",
                 value=st.session_state.fm_tops_data[fm]['TVDSS'],
-                key=f"tvdss_{fm}"
+                key=f"tvdss_{fm}_{upload_key}"
             )
         st.session_state.fm_tops_data[fm]['selected'] = selected
         st.session_state.fm_tops_data[fm]['MD'] = md
