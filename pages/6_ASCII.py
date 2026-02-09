@@ -206,7 +206,7 @@ with tab_gyro:
 with tab_fm_tops:
     st.header("Formation Tops")
 
-    # Predefined Fm Tops list (with normalized versions for matching)
+    # Predefined Fm Tops list
     fm_tops_list = [
         "Dabaa Fm",
         "Apollonia Fm",
@@ -225,6 +225,9 @@ with tab_fm_tops:
         "Kharita Fm"
     ]
 
+    # Normalized list for matching (lowercase, no spaces/quotes)
+    normalized_tops = {fm.lower().replace(" ", "").replace("'", "").replace('"', ""): fm for fm in fm_tops_list}
+
     # Data storage
     if 'fm_tops_data' not in st.session_state:
         st.session_state.fm_tops_data = {fm: {'selected': False, 'MD': 0, 'TVDSS': 0} for fm in fm_tops_list}
@@ -241,7 +244,7 @@ with tab_fm_tops:
             for i in range(len(upload_df)):
                 for j in range(len(upload_df.columns)):
                     cell = str(upload_df.iloc[i, j]).strip().upper()
-                    if 'WELL' in cell or 'WELL NAME' in cell:
+                    if 'WELL' in cell:
                         if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
                             well_name = str(upload_df.iloc[i, j+1]).strip()
                             found = True
@@ -251,35 +254,37 @@ with tab_fm_tops:
                         if found:
                             break
                 if found:
-                    break
+                            break
             st.session_state.well_name = well_name
 
-            # Auto-fill depths (clean cell names: strip quotes, replace " with ', add ' Mbr' for Abu Roash if missing)
-            matched = 0
+            # Auto-fill depths (normalize for matching: lowercase, no spaces/quotes)
+            matched = []
             for i in range(len(upload_df)):
                 for j in range(len(upload_df.columns)):
-                    cell = str(upload_df.iloc[i, j]).strip().strip('"').replace('"', "'")
-                    if 'ABU ROASH' in cell.upper() and 'MBR' not in cell.upper() and "'" in cell:
-                        cell += " Mbr"  # add suffix if it looks like a member
+                    cell = str(upload_df.iloc[i, j]).strip().lower().replace(" ", "").replace("'", "").replace('"', "")
+                    if cell in normalized_tops:
+                        fm = normalized_tops[cell]  # get original name from list
 
-                    if cell in fm_tops_list:
                         # MD in j+1, TVDSS in j+2
                         if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
                             md = int(upload_df.iloc[i, j+1])
                             tvdss = 0
                             if j + 2 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+2]):
                                 tvdss = int(upload_df.iloc[i, j+2])
-                            st.session_state.fm_tops_data[cell]['MD'] = md
-                            st.session_state.fm_tops_data[cell]['TVDSS'] = tvdss
-                            st.session_state.fm_tops_data[cell]['selected'] = True
-                            matched += 1
+                            st.session_state.fm_tops_data[fm]['MD'] = md
+                            st.session_state.fm_tops_data[fm]['TVDSS'] = tvdss
+                            st.session_state.fm_tops_data[fm]['selected'] = True
+                            matched.append(fm)
 
-            st.success(f"Matched and auto-filled {matched} Fm Tops from Excel. Review below.")
+            if matched:
+                st.success(f"Matched and auto-filled {len(matched)} Fm Tops: {', '.join(matched)}. Review below.")
+            else:
+                st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
 
         except Exception as e:
             st.error(f"Error reading Excel: {str(e)}")
 
-    # Input form: checkboxes + MD/TVDSS
+    # Input form: checkboxes + MD/TVDSS for each Fm Top
     st.subheader("Select and Edit Fm Tops")
     for fm in fm_tops_list:
         selected = st.checkbox(fm, value=st.session_state.fm_tops_data[fm]['selected'], key=f"select_{fm}")
@@ -309,7 +314,7 @@ with tab_fm_tops:
     selected_tops = [fm for fm in fm_tops_list if st.session_state.fm_tops_data[fm]['selected']]
 
     if not selected_tops:
-        st.info("No Fm Tops selected. Check boxes above.")
+        st.info("No Fm Tops selected. Check boxes above to include.")
     else:
         well_name = st.session_state.get('well_name', 'Unknown Well')
         prn_output = io.StringIO()
@@ -319,9 +324,9 @@ with tab_fm_tops:
             md = int(st.session_state.fm_tops_data[fm]['MD'])
             tvdss = int(st.session_state.fm_tops_data[fm]['TVDSS'])
             # Line 1: MD-6  (MD-6 + 3)  "Fm Name"
-            prn_output.write(f"{md-6:<5} {md-6 + 3:>22} \"{fm}\"\n")
+            prn_output.write(f"{md-6:>5} {md-6 + 3:>22} \"{fm}\"\n")
             # Line 2: MD+5  (MD+5 + 4)  "@ MD ft (- TVDSS ft TVDSS )"
-            prn_output.write(f"{md+5:<5} {md+5 + 4:>22} \"@ {md} ft (- {tvdss} ft TVDSS )\"\n")
+            prn_output.write(f"{md+5:>5} {md+5 + 4:>22} \"@ {md} ft (- {tvdss} ft TVDSS )\"\n")
 
         prn_content = prn_output.getvalue()
 
@@ -336,7 +341,6 @@ with tab_fm_tops:
             mime="text/plain",
             type="primary"
         )
-
 
 
 
