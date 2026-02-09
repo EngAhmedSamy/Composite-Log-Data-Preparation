@@ -393,39 +393,20 @@ with tab_fm_tops:
 with tab_mud_log_ascii:
     st.header("Mud Log (ASCII-1, ASCII-5)")
 
-    excel_file = st.file_uploader("Upload Drilling Parameters Excel", type=["xls", "xlsx"])
+    f excel_file:
+    try:
+        # Let pandas choose the engine automatically
+        xl = pd.ExcelFile(excel_file)  # no engine= specified → auto-detects
 
-    if excel_file:
-        try:
-            xl = pd.ExcelFile(excel_file, engine='xlrd')  # for .xls
+        sheet_names = xl.sheet_names
 
-            # Find well name (search all sheets)
-            well_name = st.session_state.get('well_name', 'Unknown Well')
-            found = False
-            for sheet in xl.sheet_names:
-                df = xl.parse(sheet, header=None, engine='xlrd')
-                for i in range(len(df)):
-                    for j in range(len(df.columns)):
-                        cell = str(df.iloc[i, j]).strip().upper()
-                        if 'WELL' in cell:
-                            if j + 1 < len(df.columns) and pd.notna(df.iloc[i, j+1]):
-                                well_name = str(df.iloc[i, j+1]).strip()
-                                found = True
-                            elif i + 1 < len(df) and pd.notna(df.iloc[i+1, j]):
-                                well_name = str(df.iloc[i+1, j]).strip()
-                                found = True
-                            if found:
-                                break
-                    if found:
-                        break
-                if found:
-                    break
-            st.session_state.well_name = well_name
-            st.success(f"**Well Name:** {well_name}")
+        well_name = st.session_state.get('well_name', 'Unknown Well')
+        st.success(f"**Well Name:** {well_name}")
 
             # ──────────────────────────────
             # ASCII 1: DRLG 1 sheet (MD, WOB, RPM)
             # ──────────────────────────────
+            ascii1_prn = None
             if 'DRLG 1' in xl.sheet_names:
                 drlg_df = xl.parse('DRLG 1', header=None, engine='xlrd')
 
@@ -523,6 +504,7 @@ with tab_mud_log_ascii:
             # ──────────────────────────────
             # ASCII 5: GAS 5 sheet (MD, ROP1, T_GAS, C1, C2, C3, IC4, NC4, C5)
             # ──────────────────────────────
+            ascii5_prn = None
             if 'GAS 5' in xl.sheet_names:
                 gas_df = xl.parse('GAS 5', header=None, engine='xlrd')
 
@@ -625,8 +607,10 @@ with tab_mud_log_ascii:
                 # ──────────────────────────────
                 zip_buf = io.BytesIO()
                 with zipfile.ZipFile(zip_buf, "w") as zf:
-                    zf.writestr(f"({well_name}) Mud Log ASCII 1.prn", ascii1_prn.getvalue())
-                    zf.writestr(f"({well_name}) Mud Log ASCII 5.prn", ascii5_prn.getvalue())
+                    if ascii1_prn:
+                        zf.writestr(f"({well_name}) Mud Log ASCII 1.prn", ascii1_prn.getvalue())
+                    if ascii5_prn:
+                        zf.writestr(f"({well_name}) Mud Log ASCII 5.prn", ascii5_prn.getvalue())
 
                 zip_buf.seek(0)
 
