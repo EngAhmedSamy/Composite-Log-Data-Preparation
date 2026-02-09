@@ -294,7 +294,7 @@ with tab_fm_tops:
                 if matched:
                     st.session_state.auto_filled = True
                     st.success(f"Matched and auto-filled {len(matched)} Fm Tops: {', '.join(matched)}. Review and adjust below.")
-                    st.rerun()  # One single rerun to refresh UI with new values
+                    # st.rerun()  # One single rerun to refresh UI with new values
                 else:
                     st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
                     st.session_state.auto_filled = True  # Prevent repeat attempts
