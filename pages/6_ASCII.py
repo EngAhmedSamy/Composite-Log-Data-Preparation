@@ -257,15 +257,14 @@ with tab_fm_tops:
                             break
             st.session_state.well_name = well_name
 
-            # Auto-fill depths (normalize for matching: lowercase, no spaces/quotes)
+            ## Auto-fill depths (normalize for matching)
             matched = []
             for i in range(len(upload_df)):
                 for j in range(len(upload_df.columns)):
                     cell = str(upload_df.iloc[i, j]).strip().lower().replace(" ", "").replace("'", "").replace('"', "")
                     if cell in normalized_tops:
-                        fm = normalized_tops[cell]  # get original name from list
+                        fm = normalized_tops[cell]  # original name from list
 
-                        # MD in j+1, TVDSS in j+2
                         if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
                             md = int(upload_df.iloc[i, j+1])
                             tvdss = 0
@@ -278,9 +277,9 @@ with tab_fm_tops:
 
             if matched:
                 st.success(f"Matched and auto-filled {len(matched)} Fm Tops: {', '.join(matched)}. Review below.")
+                st.rerun()  # ← Add this line to refresh the page and update the inputs/checkboxes
             else:
                 st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
-
         except Exception as e:
             st.error(f"Error reading Excel: {str(e)}")
 
