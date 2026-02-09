@@ -268,34 +268,75 @@ with tab_fm_tops:
                         break
                 st.session_state.well_name = well_name
 
-                # Auto-fill depths
-                matched = []
-                for i in range(len(upload_df)):
-                    for j in range(len(upload_df.columns)):
-                        cell = str(upload_df.iloc[i, j]).strip().lower().replace(" ", "").replace("'", "").replace('"', "")
-                        if cell in normalized_tops:
-                            fm = normalized_tops[cell]
+                           # Auto-fill depths (normalize for matching)
+            matched = []
+            current_file_name = excel_file.name
 
-                            if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
-                                md = int(upload_df.iloc[i, j+1])
-                                tvdss = 0
-                                if j + 2 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+2]):
-                                    tvdss = int(upload_df.iloc[i, j+2])
-                                st.session_state.fm_tops_data[fm]['MD'] = md
-                                st.session_state.fm_tops_data[fm]['TVDSS'] = tvdss
-                                st.session_state.fm_tops_data[fm]['selected'] = True
-                                matched.append(fm)
+            # Reset if new file uploaded
+            if 'last_excel_name' not in st.session_state or st.session_state.last_excel_name != current_file_name:
+                st.session_state.auto_filled = False
+                st.session_state.matched_tops = []  # clear previous matches
+                st.session_state.last_excel_name = current_file_name
 
-                if matched:
-                    st.session_state.auto_filled = True
-                    st.success(f"Matched and auto-filled {len(matched)} Fm Tops: {', '.join(matched)}. Review below.")
-                    st.rerun()  # One rerun to refresh UI with new values
-                else:
-                    st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
-                    st.session_state.auto_filled = True  # Prevent repeat
+            # Run auto-fill only if not already done for this file
+            if not st.session_state.get('auto_filled', False):
+                try:
+                    upload_df = pd.read_excel(excel_file, sheet_name=0)
 
-            except Exception as e:
-                st.error(f"Error reading Excel: {str(e)}")
+                    # Find well name
+                    well_name = st.session_state.get('well_name', 'Unknown Well')
+                    found = False
+                    for i in range(len(upload_df)):
+                        for j in range(len(upload_df.columns)):
+                            cell = str(upload_df.iloc[i, j]).strip().upper()
+                            if 'WELL' in cell:
+                                if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
+                                    well_name = str(upload_df.iloc[i, j+1]).strip()
+                                    found = True
+                                elif i + 1 < len(upload_df) and pd.notna(upload_df.iloc[i+1, j]):
+                                    well_name = str(upload_df.iloc[i+1, j]).strip()
+                                    found = True
+                                if found:
+                                    break
+                        if found:
+                            break
+                    st.session_state.well_name = well_name
+
+                    # Auto-fill
+                    for i in range(len(upload_df)):
+                        for j in range(len(upload_df.columns)):
+                            cell = str(upload_df.iloc[i, j]).strip().lower().replace(" ", "").replace("'", "").replace('"', "")
+                            if cell in normalized_tops:
+                                fm = normalized_tops[cell]
+
+                                if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
+                                    md = int(upload_df.iloc[i, j+1])
+                                    tvdss = 0
+                                    if j + 2 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+2]):
+                                        tvdss = int(upload_df.iloc[i, j+2])
+                                    st.session_state.fm_tops_data[fm]['MD'] = md
+                                    st.session_state.fm_tops_data[fm]['TVDSS'] = tvdss
+                                    st.session_state.fm_tops_data[fm]['selected'] = True
+                                    matched.append(fm)
+
+                    # Store matched list and set flag
+                    if matched:
+                        st.session_state.matched_tops = matched
+                        st.session_state.auto_filled = True
+                        st.success(f"Matched and auto-filled {len(matched)} Fm Tops: {', '.join(matched)}. Review below.")
+                        st.rerun()  # One rerun to show updated UI
+                    else:
+                        st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
+                        st.session_state.auto_filled = True
+                        st.session_state.matched_tops = []
+
+                except Exception as e:
+                    st.error(f"Error reading Excel: {str(e)}")
+
+            # Show persistent success message if auto-fill already happened
+            elif st.session_state.get('matched_tops', []):
+                st.success(f"Matched and auto-filled {len(st.session_state.matched_tops)} Fm Tops: {', '.join(st.session_state.matched_tops)}. Review below.")
+                
 
     # Input form: checkboxes + MD/TVDSS
     st.subheader("Select and Edit Fm Tops")
