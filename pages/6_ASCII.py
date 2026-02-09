@@ -257,47 +257,29 @@ with tab_fm_tops:
                             break
             st.session_state.well_name = well_name
 
-            # Auto-fill depths (normalize for matching)
+            # Auto-fill depths (normalize for matching: lowercase, no spaces/quotes)
             matched = []
-            current_file_name = excel_file.name if excel_file else None
+            for i in range(len(upload_df)):
+                for j in range(len(upload_df.columns)):
+                    cell = str(upload_df.iloc[i, j]).strip().lower().replace(" ", "").replace("'", "").replace('"', "")
+                    if cell in normalized_tops:
+                        fm = normalized_tops[cell]  # get original name from list
 
-            # Reset auto-fill if new file uploaded
-           # if 'last_excel_name' not in st.session_state or st.session_state.last_excel_name != current_file_name:
-          #      st.session_state.auto_filled = False
-          #     st.session_state.last_excel_name = current_file_name
+                        # MD in j+1, TVDSS in j+2
+                        if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
+                            md = int(upload_df.iloc[i, j+1])
+                            tvdss = 0
+                            if j + 2 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+2]):
+                                tvdss = int(upload_df.iloc[i, j+2])
+                            st.session_state.fm_tops_data[fm]['MD'] = md
+                            st.session_state.fm_tops_data[fm]['TVDSS'] = tvdss
+                            st.session_state.fm_tops_data[fm]['selected'] = True
+                            matched.append(fm)
 
-            # Run auto-fill only if not done for this file
-            if not st.session_state.get('auto_filled', False):
-                for i in range(len(upload_df)):
-                    for j in range(len(upload_df.columns)):
-                        cell = str(upload_df.iloc[i, j]).strip().lower().replace(" ", "").replace("'", "").replace('"', "")
-                        if cell in normalized_tops:
-                            fm = normalized_tops[cell]  # original name from list
-
-                            if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
-                                try:
-                                    md = int(upload_df.iloc[i, j+1])
-                                except:
-                                    md = 0
-                                tvdss = 0
-                                if j + 2 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+2]):
-                                    try:
-                                        tvdss = int(upload_df.iloc[i, j+2])
-                                    except:
-                                        tvdss = 0
-
-                                st.session_state.fm_tops_data[fm]['MD'] = md
-                                st.session_state.fm_tops_data[fm]['TVDSS'] = tvdss
-                                st.session_state.fm_tops_data[fm]['selected'] = True
-                                matched.append(fm)
-
-                if matched:
-                    st.session_state.auto_filled = True
-                    st.success(f"Matched and auto-filled {len(matched)} Fm Tops: {', '.join(matched)}. Review and adjust below.")
-                    # st.rerun()  # One single rerun to refresh UI with new values
-                else:
-                    st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
-                    #st.session_state.auto_filled = True  # Prevent repeat attempts
+            if matched:
+                st.success(f"Matched and auto-filled {len(matched)} Fm Tops: {', '.join(matched)}. Review below.")
+            else:
+                st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
 
         except Exception as e:
             st.error(f"Error reading Excel: {str(e)}")
@@ -359,8 +341,6 @@ with tab_fm_tops:
             mime="text/plain",
             type="primary"
         )
-
-
 
 
 
