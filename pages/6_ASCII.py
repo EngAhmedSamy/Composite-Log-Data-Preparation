@@ -383,211 +383,209 @@ with tab_fm_tops:
 # ────────────────────────────────────────────────
 import streamlit as st
 import pandas as pd
-from openpyxl import load_workbook
 import io
 import zipfile
 
-st.title("Mud Log ASCII-1 and ASCII-5")
+st.title("Mud Log ASCII-1 and ASCII-5 Generator")
 
-uploaded_file = st.file_uploader("Upload Excel File", type=["xls", "xlsx"])
+uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"])
 
 if uploaded_file is not None:
     file_bytes = uploaded_file.read()
-    uploaded_file.seek(0)  # reset for later use
+    uploaded_file.seek(0)
 
+    well_name = "Unknown_Well"
+    df_drlg1 = None
+    df_gas5  = None
+
+    # ─── Try modern .xlsx first ──────────────────────────────────────────────
     try:
-        # First try modern .xlsx with openpyxl
-        wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
-        st.success("Loaded as modern .xlsx format")
-    except Exception as e:
-        st.warning("Not a valid .xlsx file – trying old .xls format...")
+        wb = pd.ExcelFile(io.BytesIO(file_bytes), engine='openpyxl')
+        sheet_names = wb.sheet_names
+        st.success("Loaded as modern .xlsx")
+    except Exception:
         try:
-            # Use pandas + xlrd engine for legacy .xls
-            excel_file = pd.ExcelFile(io.BytesIO(file_bytes), engine='xlrd')
-            sheet_names = excel_file.sheet_names
-            st.info(f"Loaded as legacy .xls – sheets found: {sheet_names}")
-            
-            # We'll convert sheets we need to openpyxl-like structure later if necessary
-            # For now, just confirm it loaded
-        except Exception as xlrd_err:
-            st.error("Failed to load file with both engines.")
-            st.error("Please re-save the file in Excel as .xlsx and try again.")
+            wb = pd.ExcelFile(io.BytesIO(file_bytes), engine='xlrd')
+            sheet_names = wb.sheet_names
+            st.warning("Loaded as legacy .xls (Excel 97-2003 format)")
+        except Exception as e:
+            st.error("Cannot read the file with openpyxl or xlrd.")
+            st.error("Please open in Excel → Save As → .xlsx format and try again.")
             st.stop()
-    
-    # Find well name by searching cells
-    well_name = None
-    for sheet_name in wb.sheetnames:
-        sheet = wb[sheet_name]
-        for row in sheet.iter_rows():
-            for cell in row:
-                if cell.value and isinstance(cell.value, str) and "WELL:" in cell.value.upper():
-                    parts = cell.value.upper().split("WELL:")
-                    if len(parts) > 1:
-                        well_name = parts[1].strip()
+
+    # Find well name (simple search in all sheets)
+    for sheet_name in sheet_names:
+        try:
+            df_temp = pd.read_excel(wb, sheet_name=sheet_name, header=None, dtype=str)
+            for _, row in df_temp.iterrows():
+                for val in row:
+                    if pd.notna(val) and isinstance(val, str) and "WELL:" in val.upper():
+                        parts = val.upper().split("WELL:")
+                        if len(parts) > 1:
+                            well_name = parts[1].strip().replace("\n", " ").strip()
+                            st.info(f"Well name detected: **{well_name}**")
+                            break
+                if well_name != "Unknown_Well":
                     break
-            if well_name:
-                break
-        if well_name:
+        except:
+            continue
+        if well_name != "Unknown_Well":
             break
-    
-    if not well_name:
-        well_name = st.text_input("Enter Well Name (not found in Excel)", "Unknown Well")
-    else:
-        st.info(f"Well Name found: {well_name}")
-    
+
+    # ─── Load DRLG 1 ─────────────────────────────────────────────────────────
+    if "DRLG 1" in sheet_names:
+        try:
+            df_drlg1 = pd.read_excel(
+                wb,
+                sheet_name="DRLG 1",
+                header=None,
+                dtype=str,
+                keep_default_na=False
+            )
+            st.success("DRLG 1 sheet loaded")
+        except Exception as e:
+            st.warning(f"Could not read DRLG 1: {e}")
+
+    # ─── Load GAS 5 ──────────────────────────────────────────────────────────
+    if "GAS 5" in sheet_names:
+        try:
+            df_gas5 = pd.read_excel(
+                wb,
+                sheet_name="GAS 5",
+                header=None,
+                dtype=str,
+                keep_default_na=False
+            )
+            st.success("GAS 5 sheet loaded")
+        except Exception as e:
+            st.warning(f"Could not read GAS 5: {e}")
+
+    # ─── Process ASCII 1 (MD, WOB, RPM) ──────────────────────────────────────
     prn1_content = None
-    prn5_content = None
-    
-    # Process ASCII 1 from 'DRLG 1' sheet
-    if "DRLG 1" in wb.sheetnames:
-        sheet = wb["DRLG 1"]
-        depth_col = None
-        header_row = None
-        for row_idx in range(1, sheet.max_row + 1):
-            for col_idx in range(1, sheet.max_column + 1):
-                cell = sheet.cell(row_idx, col_idx)
-                if cell.value and isinstance(cell.value, str) and ("DEPTH" in cell.value.upper() or "T_DPTH" in cell.value.upper()):
-                    unit_cell = sheet.cell(row_idx + 1, col_idx)
-                    if unit_cell.value and "FT" in str(unit_cell.value).upper():
-                        wob_cell = sheet.cell(row_idx, col_idx + 1)
-                        if wob_cell.value and "WOB" in str(wob_cell.value).upper():
-                            wob_unit = sheet.cell(row_idx + 1, col_idx + 1)
-                            if wob_unit.value and "KLBS" in str(wob_unit.value).upper():
-                                rpm_cell = sheet.cell(row_idx, col_idx + 2)
-                                if rpm_cell.value and "RPM" in str(rpm_cell.value).upper():
-                                    rpm_unit = sheet.cell(row_idx + 1, col_idx + 2)
-                                    if rpm_unit.value and "R/MIN" in str(rpm_unit.value).upper():
-                                        depth_col = col_idx
-                                        header_row = row_idx
-                                        data_start_row = row_idx + 2
-                                        break
-            if depth_col:
-                break
-        
-        if depth_col:
-            data = []
-            for r in range(data_start_row, sheet.max_row + 1):
-                depth = sheet.cell(r, depth_col).value
-                wob = sheet.cell(r, depth_col + 1).value
-                rpm = sheet.cell(r, depth_col + 2).value
-                if depth is not None:
+    if df_drlg1 is not None:
+        # Look for header row containing T_Dpth / Depth, WOB, RPM
+        header_row_idx = None
+        for i, row in df_drlg1.iterrows():
+            row_str = row.astype(str).str.upper().str.strip()
+            if any("T_DPTH" in x or "DEPTH" in x or "MD" in x for x in row_str):
+                if any("WOB" in x for x in row_str) and any("RPM" in x for x in row_str):
+                    header_row_idx = i
+                    break
+
+        if header_row_idx is not None:
+            # Assume data starts 2 rows below header (after units)
+            data_start = header_row_idx + 2
+            df_data = df_drlg1.iloc[data_start:].copy()
+
+            # Try to find column indices
+            cols = df_drlg1.iloc[header_row_idx].astype(str).str.upper().str.strip()
+            depth_col = None
+            wob_col   = None
+            rpm_col   = None
+
+            for j, val in enumerate(cols):
+                if "T_DPTH" in val or "DEPTH" in val or "MD" in val:
+                    depth_col = j
+                if "WOB" in val:
+                    wob_col = j
+                if "RPM" in val:
+                    rpm_col = j
+
+            if depth_col is not None and wob_col is not None and rpm_col is not None:
+                prn1_lines = [f"Well: {well_name} MD WOB RPM"]
+                for _, row in df_data.iterrows():
                     try:
-                        depth = float(depth)
-                        wob = float(wob) if wob is not None else 0
-                        rpm = float(rpm) if rpm is not None else 0
-                        data.append((depth, wob, rpm))
-                    except ValueError:
+                        d = float(row.iloc[depth_col])
+                        w = float(row.iloc[wob_col]) if pd.notna(row.iloc[wob_col]) else 0.0
+                        r = float(row.iloc[rpm_col]) if pd.notna(row.iloc[rpm_col]) else 0.0
+                        prn1_lines.append(f"{d:.0f} {w:.0f} {r:.0f}")
+                    except (ValueError, TypeError):
+                        continue  # skip invalid rows
+
+                if len(prn1_lines) > 1:
+                    prn1_content = "\n".join(prn1_lines) + "\n"
+                    st.subheader("ASCII 1 Preview (first 20 lines)")
+                    st.text("\n".join(prn1_lines[:21]))
+                else:
+                    st.warning("No valid numeric data found in DRLG 1")
+
+    # ─── Process ASCII 5 (MD, ROP1, TG, C1–C5) ───────────────────────────────
+    prn5_content = None
+    if df_gas5 is not None:
+        header_row_idx = None
+        for i, row in df_gas5.iterrows():
+            row_str = row.astype(str).str.upper().str.strip()
+            if any("T_DPTH" in x or "DEPTH" in x or "MD" in x for x in row_str):
+                if any("ROP" in x for x in row_str) and any("C1" in x for x in row_str):
+                    header_row_idx = i
+                    break
+
+        if header_row_idx is not None:
+            data_start = header_row_idx + 2
+            df_data = df_gas5.iloc[data_start:].copy()
+
+            cols = df_gas5.iloc[header_row_idx].astype(str).str.upper().str.strip()
+            depth_col = next((j for j, v in enumerate(cols) if "T_DPTH" in v or "DEPTH" in v or "MD" in v), None)
+            rop_col   = next((j for j, v in enumerate(cols) if "ROP" in v), None)
+            tg_col    = next((j for j, v in enumerate(cols) if "TG" in v or "T_GAS" in v), None)
+
+            gas_cols = []
+            for name in ["C1", "C2", "C3", "C4I", "C4N", "C5", "IC4", "NC4"]:
+                idx = next((j for j, v in enumerate(cols) if name in v), None)
+                if idx is not None:
+                    gas_cols.append((name, idx))
+
+            if depth_col is not None and rop_col is not None and tg_col is not None and len(gas_cols) >= 5:
+                header = f"Well: {well_name} MD ROP TG " + " ".join(n for n, _ in gas_cols)
+                prn5_lines = [header]
+
+                for _, row in df_data.iterrows():
+                    try:
+                        values = []
+                        values.append(float(row.iloc[depth_col]))
+                        values.append(float(row.iloc[rop_col]))
+                        values.append(float(row.iloc[tg_col]))
+                        for _, idx in gas_cols:
+                            v = row.iloc[idx]
+                            values.append(float(v) if pd.notna(v) else 0.0)
+                        prn5_lines.append(" ".join(f"{v:.0f}" if i > 0 else f"{v:.1f}" for i, v in enumerate(values)))
+                    except (ValueError, TypeError):
                         continue
-            
-            if data:
-                prn1_content = f"Well: {well_name} MD WOB RPM\n"
-                for d, w, r in data:
-                    prn1_content += f"{d} {w} {r}\n"
-    
-    # Process ASCII 5 from 'GAS 5' sheet
-    if "GAS 5" in wb.sheetnames:
-        sheet = wb["GAS 5"]
-        depth_col = None
-        header_row = None
-        for row_idx in range(1, sheet.max_row + 1):
-            for col_idx in range(1, sheet.max_column + 1):
-                cell = sheet.cell(row_idx, col_idx)
-                if cell.value and isinstance(cell.value, str) and ("DEPTH" in cell.value.upper() or "T_DPTH" in cell.value.upper() or "MD" in cell.value.upper()):
-                    unit_cell = sheet.cell(row_idx + 1, col_idx)
-                    if unit_cell.value and "FT" in str(unit_cell.value).upper():
-                        rop_cell = sheet.cell(row_idx, col_idx + 1)
-                        if rop_cell.value and "ROP" in str(rop_cell.value).upper():
-                            rop_unit = sheet.cell(row_idx + 1, col_idx + 1)
-                            if rop_unit.value and "FT/HR" in str(rop_unit.value).upper():
-                                tg_cell = sheet.cell(row_idx, col_idx + 2)
-                                if tg_cell.value and ("T_GAS" in str(tg_cell.value).upper() or "TG" in str(tg_cell.value).upper()):
-                                    tg_unit = sheet.cell(row_idx + 1, col_idx + 2)
-                                    if tg_unit.value and "%" in str(tg_unit.value).upper():
-                                        c1_cell = sheet.cell(row_idx, col_idx + 3)
-                                        if c1_cell.value and "C1" in str(c1_cell.value).upper():
-                                            c1_unit = sheet.cell(row_idx + 1, col_idx + 3)
-                                            if c1_unit.value and "PPM" in str(c1_unit.value).upper():
-                                                c2_cell = sheet.cell(row_idx, col_idx + 4)
-                                                if c2_cell.value and "C2" in str(c2_cell.value).upper():
-                                                    c2_unit = sheet.cell(row_idx + 1, col_idx + 4)
-                                                    if c2_unit.value and "PPM" in str(c2_unit.value).upper():
-                                                        c3_cell = sheet.cell(row_idx, col_idx + 5)
-                                                        if c3_cell.value and "C3" in str(c3_cell.value).upper():
-                                                            c3_unit = sheet.cell(row_idx + 1, col_idx + 5)
-                                                            if c3_unit.value and "PPM" in str(c3_unit.value).upper():
-                                                                ic4_cell = sheet.cell(row_idx, col_idx + 6)
-                                                                if ic4_cell.value and ("IC4" in str(ic4_cell.value).upper() or "C4I" in str(ic4_cell.value).upper()):
-                                                                    ic4_unit = sheet.cell(row_idx + 1, col_idx + 6)
-                                                                    if ic4_unit.value and "PPM" in str(ic4_unit.value).upper():
-                                                                        nc4_cell = sheet.cell(row_idx, col_idx + 7)
-                                                                        if nc4_cell.value and ("NC4" in str(nc4_cell.value).upper() or "C4N" in str(nc4_cell.value).upper()):
-                                                                            nc4_unit = sheet.cell(row_idx + 1, col_idx + 7)
-                                                                            if nc4_unit.value and "PPM" in str(nc4_unit.value).upper():
-                                                                                c5_cell = sheet.cell(row_idx, col_idx + 8)
-                                                                                if c5_cell.value and "C5" in str(c5_cell.value).upper():
-                                                                                    c5_unit = sheet.cell(row_idx + 1, col_idx + 8)
-                                                                                    if c5_unit.value and "PPM" in str(c5_unit.value).upper():
-                                                                                        depth_col = col_idx
-                                                                                        header_row = row_idx
-                                                                                        data_start_row = row_idx + 2
-                                                                                        break
-            if depth_col:
-                break
-        
-        if depth_col:
-            data = []
-            for r in range(data_start_row, sheet.max_row + 1):
-                values = []
-                for c in range(0, 9):
-                    val = sheet.cell(r, depth_col + c).value
-                    if val is not None:
-                        try:
-                            val = float(val)
-                        except ValueError:
-                            val = 0
-                    else:
-                        val = 0
-                    values.append(val)
-                if values[0] != 0:  # Assume depth > 0
-                    data.append(values)
-            
-            if data:
-                prn5_content = f"Well: {well_name} MD ROP TG C1 C2 C3 C4I C4N C5\n"
-                for row in data:
-                    prn5_content += " ".join(str(v) for v in row) + "\n"
-    
-    # Previews
+
+                if len(prn5_lines) > 1:
+                    prn5_content = "\n".join(prn5_lines) + "\n"
+                    st.subheader("ASCII 5 Preview (first 20 lines)")
+                    st.text("\n".join(prn5_lines[:21]))
+                else:
+                    st.warning("No valid numeric data found in GAS 5")
+
+    # ─── Download buttons ────────────────────────────────────────────────────
     if prn1_content:
-        st.subheader("Preview ASCII 1")
-        st.text(prn1_content[:2000] + "..." if len(prn1_content) > 2000 else prn1_content)
         st.download_button(
-            label="Download ASCII 1 .prn",
-            data=prn1_content,
-            file_name=f"{well_name} Mud Log Ascii 1.prn",
+            "Download ASCII 1 .prn",
+            prn1_content,
+            file_name=f"{well_name}_Mud_Log_Ascii_1.prn",
             mime="text/plain"
         )
-    
+
     if prn5_content:
-        st.subheader("Preview ASCII 5")
-        st.text(prn5_content[:2000] + "..." if len(prn5_content) > 2000 else prn5_content)
         st.download_button(
-            label="Download ASCII 5 .prn",
-            data=prn5_content,
-            file_name=f"{well_name} Mud Log Ascii 5.prn",
+            "Download ASCII 5 .prn",
+            prn5_content,
+            file_name=f"{well_name}_Mud_Log_Ascii_5.prn",
             mime="text/plain"
         )
-    
+
     if prn1_content and prn5_content:
-        # Create ZIP (as RAR requires additional libs, using ZIP instead)
         zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w") as zf:
-            zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
-            zf.writestr(f"{well_name} Mud Log Ascii 5.prn", prn5_content)
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(f"{well_name}_Mud_Log_Ascii_1.prn", prn1_content)
+            zf.writestr(f"{well_name}_Mud_Log_Ascii_5.prn", prn5_content)
         zip_buffer.seek(0)
         st.download_button(
-            label="Download Both in ZIP (RAR alternative)",
-            data=zip_buffer,
-            file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
+            "Download Both (ZIP)",
+            zip_buffer,
+            file_name=f"{well_name}_Mud_Log_Ascii_1_&_5.zip",
             mime="application/zip"
         )
 
