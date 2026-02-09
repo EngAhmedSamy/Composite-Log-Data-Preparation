@@ -299,8 +299,8 @@ with tab_fm_tops:
                     st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
                     st.session_state.auto_filled = True  # Prevent repeat attempts
 
-        except Exception as e:
-            st.error(f"Error reading Excel: {str(e)}")
+       # except Exception as e:
+          #  st.error(f"Error reading Excel: {str(e)}")
 
     # Input form: checkboxes + MD/TVDSS for each Fm Top
     st.subheader("Select and Edit Fm Tops")
