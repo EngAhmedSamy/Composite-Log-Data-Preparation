@@ -231,70 +231,83 @@ with tab_fm_tops:
     # Data storage
     if 'fm_tops_data' not in st.session_state:
         st.session_state.fm_tops_data = {fm: {'selected': False, 'MD': 0, 'TVDSS': 0} for fm in fm_tops_list}
-    
+
     # Upload Excel option
     excel_file = st.file_uploader("Upload Fm Tops Excel (optional)", type=["xlsx", "xls"])
+
+    # Auto-fill logic - only run once per file
     if excel_file:
-        try:
-            upload_df = pd.read_excel(excel_file, sheet_name=0)
+        current_file_name = excel_file.name
 
-            # Find well name
-            well_name = st.session_state.get('well_name', 'Unknown Well')
-            found = False
-            for i in range(len(upload_df)):
-                for j in range(len(upload_df.columns)):
-                    cell = str(upload_df.iloc[i, j]).strip().upper()
-                    if 'WELL' in cell:
-                        if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
-                            well_name = str(upload_df.iloc[i, j+1]).strip()
-                            found = True
-                        elif i + 1 < len(upload_df) and pd.notna(upload_df.iloc[i+1, j]):
-                            well_name = str(upload_df.iloc[i+1, j]).strip()
-                            found = True
-                        if found:
-                            break
-                if found:
-                            break
-            st.session_state.well_name = well_name
+        # Reset flag if new file uploaded
+        if 'last_excel_name' not in st.session_state or st.session_state.last_excel_name != current_file_name:
+            st.session_state.auto_filled = False
+            st.session_state.last_excel_name = current_file_name
 
-            
-        
-            # Auto-fill depths (normalize for matching: lowercase, no spaces/quotes)
-            matched = []
-            for i in range(len(upload_df)):
-                for j in range(len(upload_df.columns)):
-                    cell = str(upload_df.iloc[i, j]).strip().lower().replace(" ", "").replace("'", "").replace('"', "")
-                    if cell in normalized_tops:
-                        fm = normalized_tops[cell]  # get original name from list
+        # Run auto-fill only if not already done for this file
+        if not st.session_state.get('auto_filled', False):
+            try:
+                upload_df = pd.read_excel(excel_file, sheet_name=0)
 
-                        # MD in j+1, TVDSS in j+2
-                        if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
-                            md = int(upload_df.iloc[i, j+1])
-                            tvdss = 0
-                            if j + 2 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+2]):
-                                tvdss = int(upload_df.iloc[i, j+2])
-                            st.session_state.fm_tops_data[fm]['MD'] = md
-                            st.session_state.fm_tops_data[fm]['TVDSS'] = tvdss
-                            st.session_state.fm_tops_data[fm]['selected'] = True
-                            matched.append(fm)
+                # Find well name
+                well_name = st.session_state.get('well_name', 'Unknown Well')
+                found = False
+                for i in range(len(upload_df)):
+                    for j in range(len(upload_df.columns)):
+                        cell = str(upload_df.iloc[i, j]).strip().upper()
+                        if 'WELL' in cell:
+                            if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
+                                well_name = str(upload_df.iloc[i, j+1]).strip()
+                                found = True
+                            elif i + 1 < len(upload_df) and pd.notna(upload_df.iloc[i+1, j]):
+                                well_name = str(upload_df.iloc[i+1, j]).strip()
+                                found = True
+                            if found:
+                                break
+                    if found:
+                        break
+                st.session_state.well_name = well_name
 
-            if matched:
-                st.success(f"Matched and auto-filled {len(matched)} Fm Tops: {', '.join(matched)}. Review below.")
-            else:
-                st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
+                # Auto-fill depths
+                matched = []
+                for i in range(len(upload_df)):
+                    for j in range(len(upload_df.columns)):
+                        cell = str(upload_df.iloc[i, j]).strip().lower().replace(" ", "").replace("'", "").replace('"', "")
+                        if cell in normalized_tops:
+                            fm = normalized_tops[cell]
 
-        except Exception as e:
-            st.error(f"Error reading Excel: {str(e)}")
+                            if j + 1 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+1]):
+                                md = int(upload_df.iloc[i, j+1])
+                                tvdss = 0
+                                if j + 2 < len(upload_df.columns) and pd.notna(upload_df.iloc[i, j+2]):
+                                    tvdss = int(upload_df.iloc[i, j+2])
+                                st.session_state.fm_tops_data[fm]['MD'] = md
+                                st.session_state.fm_tops_data[fm]['TVDSS'] = tvdss
+                                st.session_state.fm_tops_data[fm]['selected'] = True
+                                matched.append(fm)
 
+                if matched:
+                    st.session_state.auto_filled = True
+                    st.success(f"Matched and auto-filled {len(matched)} Fm Tops: {', '.join(matched)}. Review below.")
+                    st.rerun()  # One rerun to refresh UI with new values
+                else:
+                    st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
+                    st.session_state.auto_filled = True  # Prevent repeat
 
-    
+            except Exception as e:
+                st.error(f"Error reading Excel: {str(e)}")
 
-    # Input form: checkboxes + MD/TVDSS for each Fm Top
+    # Input form: checkboxes + MD/TVDSS
     st.subheader("Select and Edit Fm Tops")
     for fm in fm_tops_list:
         # Use a dynamic key that changes when upload happens
         upload_key = st.session_state.get('last_excel_name', 'no_upload')
-        selected = st.checkbox(fm, value=st.session_state.fm_tops_data[fm]['selected'], key=f"select_{fm}_{upload_key}")
+        selected = st.checkbox(
+            fm,
+            value=st.session_state.fm_tops_data[fm]['selected'],
+            key=f"select_{fm}_{upload_key}"
+        )
+        
         col_md, col_tvdss = st.columns(2)
         with col_md:
             md = st.number_input(
@@ -309,15 +322,13 @@ with tab_fm_tops:
                 value=st.session_state.fm_tops_data[fm]['TVDSS'],
                 key=f"tvdss_{fm}_{upload_key}"
             )
+        # Update session state with current widget values
         st.session_state.fm_tops_data[fm]['selected'] = selected
         st.session_state.fm_tops_data[fm]['MD'] = md
         st.session_state.fm_tops_data[fm]['TVDSS'] = tvdss
 
-    # ──────────────────────────────
-    #   Preview & Download PRN
-    # ──────────────────────────────
+    # Preview & Download PRN
     st.subheader("PRN Preview & Download")
-
     selected_tops = [fm for fm in fm_tops_list if st.session_state.fm_tops_data[fm]['selected']]
 
     if not selected_tops:
@@ -330,17 +341,13 @@ with tab_fm_tops:
         for fm in selected_tops:
             md = int(st.session_state.fm_tops_data[fm]['MD'])
             tvdss = int(st.session_state.fm_tops_data[fm]['TVDSS'])
-            # Line 1: MD-6  (MD-6 + 3)  "Fm Name"
             prn_output.write(f"{md-6:>5} {md-6 + 3:>22} \"{fm}\"\n")
-            # Line 2: MD+5  (MD+5 + 4)  "@ MD ft (- TVDSS ft TVDSS )"
             prn_output.write(f"{md+5:>5} {md+5 + 4:>22} \"@ {md} ft (- {tvdss} ft TVDSS )\"\n")
 
         prn_content = prn_output.getvalue()
 
-        # Preview
         st.code(prn_content, language="text")
 
-        # Download
         st.download_button(
             label="Download Fm Tops PRN",
             data=prn_content,
