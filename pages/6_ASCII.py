@@ -297,7 +297,7 @@ with tab_fm_tops:
                     # st.rerun()  # One single rerun to refresh UI with new values
                 else:
                     st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
-                    st.session_state.auto_filled = True  # Prevent repeat attempts
+                    #st.session_state.auto_filled = True  # Prevent repeat attempts
 
         except Exception as e:
             st.error(f"Error reading Excel: {str(e)}")
