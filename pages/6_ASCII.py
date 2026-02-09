@@ -382,6 +382,9 @@ with tab_fm_tops:
 
 
 
+
+
+
 # ────────────────────────────────────────────────
 # 3. Mud Log (ASCII-1, ASCII-5)
 # ────────────────────────────────────────────────
@@ -402,7 +405,7 @@ with tab_mud_log_ascii:
                 df = xl.parse(sheet_name, header=None)
                 for i in range(len(df)):
                     for j in range(len(df.columns)):
-                        cell = str(df.iloc[i, j]).strip().upper()
+                        cell = str(df.iloc[i, j]).strip().lower().upper()
                         if 'WELL' in cell:
                             if j + 1 < len(df.columns) and pd.notna(df.iloc[i, j+1]):
                                 well_name = str(df.iloc[i, j+1]).strip()
@@ -435,8 +438,8 @@ with tab_mud_log_ascii:
 
                 for i in range(len(drlg_df) - 1):
                     for j in range(len(drlg_df.columns)):
-                        cell = str(drlg_df.iloc[i, j]).strip().upper()
-                        below = str(drlg_df.iloc[i+1, j]).strip().upper()
+                        cell = str(drlg_df.iloc[i, j]).strip().lower().upper()
+                        below = str(drlg_df.iloc[i+1, j]).strip().lower().upper()
 
                         # MD
                         if any(kw in cell for kw in depth_keywords) and ("FT" in below or "FEET" in below or below in ["", " "]):
@@ -454,7 +457,7 @@ with tab_mud_log_ascii:
                 if md_col is None:
                     for i in range(len(drlg_df)):
                         for j in range(len(drlg_df.columns)):
-                            cell = str(drlg_df.iloc[i, j]).strip().upper()
+                            cell = str(drlg_df.iloc[i, j]).strip().lower().upper()
                             if any(kw in cell for kw in depth_keywords):
                                 md_col = j
                                 break
@@ -464,7 +467,7 @@ with tab_mud_log_ascii:
                 if wob_col is None:
                     for i in range(len(drlg_df)):
                         for j in range(len(drlg_df.columns)):
-                            cell = str(drlg_df.iloc[i, j]).strip().upper()
+                            cell = str(drlg_df.iloc[i, j]).strip().lower().upper()
                             if any(kw in cell for kw in wob_keywords):
                                 wob_col = j
                                 break
@@ -474,7 +477,7 @@ with tab_mud_log_ascii:
                 if rpm_col is None:
                     for i in range(len(drlg_df)):
                         for j in range(len(drlg_df.columns)):
-                            cell = str(drlg_df.iloc[i, j]).strip().upper()
+                            cell = str(drlg_df.iloc[i, j]).strip().lower().upper()
                             if any(kw in cell for kw in rpm_keywords):
                                 rpm_col = j
                                 break
@@ -537,8 +540,8 @@ with tab_mud_log_ascii:
 
                 for i in range(len(gas_df) - 1):
                     for j in range(len(gas_df.columns)):
-                        cell = str(gas_df.iloc[i, j]).strip().upper()
-                        below = str(gas_df.iloc[i+1, j]).strip().upper()
+                        cell = str(gas_df.iloc[i, j]).strip().lower().upper()
+                        below = str(gas_df.iloc[i+1, j]).strip().lower().upper()
 
                         if any(kw in cell for kw in depth_keywords) and ("FT" in below or "FEET" in below or below in ["", " "]):
                             md_col = j
@@ -571,7 +574,7 @@ with tab_mud_log_ascii:
                 if md_col is None:
                     for i in range(len(gas_df)):
                         for j in range(len(gas_df.columns)):
-                            cell = str(gas_df.iloc[i, j]).strip().upper()
+                            cell = str(gas_df.iloc[i, j]).strip().lower().upper()
                             if any(kw in cell for kw in depth_keywords):
                                 md_col = j
                                 break
