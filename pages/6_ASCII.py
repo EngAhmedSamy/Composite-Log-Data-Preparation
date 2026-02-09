@@ -397,8 +397,9 @@ with tab_mud_log_ascii:
 
     if excel_file:
         try:
-            # Let pandas choose the engine automatically
-            xl = pd.ExcelFile(excel_file)  # no engine= specified → auto-detects
+            # Let pandas auto-detect engine (openpyxl for .xlsx, xlrd for .xls)
+            xl = pd.ExcelFile(excel_file)
+
             sheet_names = xl.sheet_names
 
             well_name = st.session_state.get('well_name', 'Unknown Well')
@@ -600,14 +601,9 @@ with tab_mud_log_ascii:
                 file_name=f"({well_name}) Mud Log ASCII 1 & 5.zip",
                 mime="application/zip"
             )
-        else:
-            st.warning("Sheet 'GAS 5' not found in Excel.")
-    except Exception as e:
-        st.error(f"Error processing file: {str(e)}")
-        st.info("Make sure the file has 'DRLG 1' and 'GAS 5' sheets.")
-
-
-
+        except Exception as e:
+            st.error(f"Error processing file: {str(e)}")
+            st.info("Make sure the file has 'DRLG 1' and 'GAS 5' sheets.")
 
 
 
