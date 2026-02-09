@@ -192,14 +192,7 @@ with tab_gyro:
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
             st.info("Check if the file is valid Excel and contains the expected data.")
-
-
-
-
-
-
-
-
+            
 
 
 # ────────────────────────────────────────────────
@@ -385,12 +378,198 @@ with tab_fm_tops:
 
 
 
-
 # ────────────────────────────────────────────────
 # 3. Mud Log (ASCII-1, ASCII-5)
 # ────────────────────────────────────────────────
+import streamlit as st
+from openpyxl import load_workbook
+import io
+import zipfile
 
+st.title("Mud Log ASCII-1 and ASCII-5")
 
+uploaded_file = st.file_uploader("Upload Excel File", type=["xls", "xlsx"])
+
+if uploaded_file:
+    # Load the workbook
+    wb = load_workbook(uploaded_file, data_only=True)
+    
+    # Find well name by searching cells
+    well_name = None
+    for sheet_name in wb.sheetnames:
+        sheet = wb[sheet_name]
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.value and isinstance(cell.value, str) and "WELL:" in cell.value.upper():
+                    parts = cell.value.upper().split("WELL:")
+                    if len(parts) > 1:
+                        well_name = parts[1].strip()
+                    break
+            if well_name:
+                break
+        if well_name:
+            break
+    
+    if not well_name:
+        well_name = st.text_input("Enter Well Name (not found in Excel)", "Unknown Well")
+    else:
+        st.info(f"Well Name found: {well_name}")
+    
+    prn1_content = None
+    prn5_content = None
+    
+    # Process ASCII 1 from 'DRLG 1' sheet
+    if "DRLG 1" in wb.sheetnames:
+        sheet = wb["DRLG 1"]
+        depth_col = None
+        header_row = None
+        for row_idx in range(1, sheet.max_row + 1):
+            for col_idx in range(1, sheet.max_column + 1):
+                cell = sheet.cell(row_idx, col_idx)
+                if cell.value and isinstance(cell.value, str) and ("DEPTH" in cell.value.upper() or "T_DPTH" in cell.value.upper()):
+                    unit_cell = sheet.cell(row_idx + 1, col_idx)
+                    if unit_cell.value and "FT" in str(unit_cell.value).upper():
+                        wob_cell = sheet.cell(row_idx, col_idx + 1)
+                        if wob_cell.value and "WOB" in str(wob_cell.value).upper():
+                            wob_unit = sheet.cell(row_idx + 1, col_idx + 1)
+                            if wob_unit.value and "KLBS" in str(wob_unit.value).upper():
+                                rpm_cell = sheet.cell(row_idx, col_idx + 2)
+                                if rpm_cell.value and "RPM" in str(rpm_cell.value).upper():
+                                    rpm_unit = sheet.cell(row_idx + 1, col_idx + 2)
+                                    if rpm_unit.value and "R/MIN" in str(rpm_unit.value).upper():
+                                        depth_col = col_idx
+                                        header_row = row_idx
+                                        data_start_row = row_idx + 2
+                                        break
+            if depth_col:
+                break
+        
+        if depth_col:
+            data = []
+            for r in range(data_start_row, sheet.max_row + 1):
+                depth = sheet.cell(r, depth_col).value
+                wob = sheet.cell(r, depth_col + 1).value
+                rpm = sheet.cell(r, depth_col + 2).value
+                if depth is not None:
+                    try:
+                        depth = float(depth)
+                        wob = float(wob) if wob is not None else 0
+                        rpm = float(rpm) if rpm is not None else 0
+                        data.append((depth, wob, rpm))
+                    except ValueError:
+                        continue
+            
+            if data:
+                prn1_content = f"Well: {well_name} MD WOB RPM\n"
+                for d, w, r in data:
+                    prn1_content += f"{d} {w} {r}\n"
+    
+    # Process ASCII 5 from 'GAS 5' sheet
+    if "GAS 5" in wb.sheetnames:
+        sheet = wb["GAS 5"]
+        depth_col = None
+        header_row = None
+        for row_idx in range(1, sheet.max_row + 1):
+            for col_idx in range(1, sheet.max_column + 1):
+                cell = sheet.cell(row_idx, col_idx)
+                if cell.value and isinstance(cell.value, str) and ("DEPTH" in cell.value.upper() or "T_DPTH" in cell.value.upper() or "MD" in cell.value.upper()):
+                    unit_cell = sheet.cell(row_idx + 1, col_idx)
+                    if unit_cell.value and "FT" in str(unit_cell.value).upper():
+                        rop_cell = sheet.cell(row_idx, col_idx + 1)
+                        if rop_cell.value and "ROP" in str(rop_cell.value).upper():
+                            rop_unit = sheet.cell(row_idx + 1, col_idx + 1)
+                            if rop_unit.value and "FT/HR" in str(rop_unit.value).upper():
+                                tg_cell = sheet.cell(row_idx, col_idx + 2)
+                                if tg_cell.value and ("T_GAS" in str(tg_cell.value).upper() or "TG" in str(tg_cell.value).upper()):
+                                    tg_unit = sheet.cell(row_idx + 1, col_idx + 2)
+                                    if tg_unit.value and "%" in str(tg_unit.value).upper():
+                                        c1_cell = sheet.cell(row_idx, col_idx + 3)
+                                        if c1_cell.value and "C1" in str(c1_cell.value).upper():
+                                            c1_unit = sheet.cell(row_idx + 1, col_idx + 3)
+                                            if c1_unit.value and "PPM" in str(c1_unit.value).upper():
+                                                c2_cell = sheet.cell(row_idx, col_idx + 4)
+                                                if c2_cell.value and "C2" in str(c2_cell.value).upper():
+                                                    c2_unit = sheet.cell(row_idx + 1, col_idx + 4)
+                                                    if c2_unit.value and "PPM" in str(c2_unit.value).upper():
+                                                        c3_cell = sheet.cell(row_idx, col_idx + 5)
+                                                        if c3_cell.value and "C3" in str(c3_cell.value).upper():
+                                                            c3_unit = sheet.cell(row_idx + 1, col_idx + 5)
+                                                            if c3_unit.value and "PPM" in str(c3_unit.value).upper():
+                                                                ic4_cell = sheet.cell(row_idx, col_idx + 6)
+                                                                if ic4_cell.value and ("IC4" in str(ic4_cell.value).upper() or "C4I" in str(ic4_cell.value).upper()):
+                                                                    ic4_unit = sheet.cell(row_idx + 1, col_idx + 6)
+                                                                    if ic4_unit.value and "PPM" in str(ic4_unit.value).upper():
+                                                                        nc4_cell = sheet.cell(row_idx, col_idx + 7)
+                                                                        if nc4_cell.value and ("NC4" in str(nc4_cell.value).upper() or "C4N" in str(nc4_cell.value).upper()):
+                                                                            nc4_unit = sheet.cell(row_idx + 1, col_idx + 7)
+                                                                            if nc4_unit.value and "PPM" in str(nc4_unit.value).upper():
+                                                                                c5_cell = sheet.cell(row_idx, col_idx + 8)
+                                                                                if c5_cell.value and "C5" in str(c5_cell.value).upper():
+                                                                                    c5_unit = sheet.cell(row_idx + 1, col_idx + 8)
+                                                                                    if c5_unit.value and "PPM" in str(c5_unit.value).upper():
+                                                                                        depth_col = col_idx
+                                                                                        header_row = row_idx
+                                                                                        data_start_row = row_idx + 2
+                                                                                        break
+            if depth_col:
+                break
+        
+        if depth_col:
+            data = []
+            for r in range(data_start_row, sheet.max_row + 1):
+                values = []
+                for c in range(0, 9):
+                    val = sheet.cell(r, depth_col + c).value
+                    if val is not None:
+                        try:
+                            val = float(val)
+                        except ValueError:
+                            val = 0
+                    else:
+                        val = 0
+                    values.append(val)
+                if values[0] != 0:  # Assume depth > 0
+                    data.append(values)
+            
+            if data:
+                prn5_content = f"Well: {well_name} MD ROP TG C1 C2 C3 C4I C4N C5\n"
+                for row in data:
+                    prn5_content += " ".join(str(v) for v in row) + "\n"
+    
+    # Previews
+    if prn1_content:
+        st.subheader("Preview ASCII 1")
+        st.text(prn1_content[:2000] + "..." if len(prn1_content) > 2000 else prn1_content)
+        st.download_button(
+            label="Download ASCII 1 .prn",
+            data=prn1_content,
+            file_name=f"{well_name} Mud Log Ascii 1.prn",
+            mime="text/plain"
+        )
+    
+    if prn5_content:
+        st.subheader("Preview ASCII 5")
+        st.text(prn5_content[:2000] + "..." if len(prn5_content) > 2000 else prn5_content)
+        st.download_button(
+            label="Download ASCII 5 .prn",
+            data=prn5_content,
+            file_name=f"{well_name} Mud Log Ascii 5.prn",
+            mime="text/plain"
+        )
+    
+    if prn1_content and prn5_content:
+        # Create ZIP (as RAR requires additional libs, using ZIP instead)
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
+            zf.writestr(f"{well_name} Mud Log Ascii 5.prn", prn5_content)
+        zip_buffer.seek(0)
+        st.download_button(
+            label="Download Both in ZIP (RAR alternative)",
+            data=zip_buffer,
+            file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
+            mime="application/zip"
+        )
 
 
 
