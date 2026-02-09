@@ -397,40 +397,49 @@ with tab_mud_log_ascii:
 
     if excel_file:
         try:
-            # Let pandas auto-detect engine (openpyxl for .xlsx, xlrd for .xls)
+            # Let pandas auto-detect engine
             xl = pd.ExcelFile(excel_file)
-
             sheet_names = xl.sheet_names
 
+            # Use global well name
             well_name = st.session_state.get('well_name', 'Unknown Well')
             st.success(f"**Well Name:** {well_name}")
 
             # ──────────────────────────────
-            # ASCII 1: DRLG 1 sheet (MD, WOB, RPM)
+            # ASCII 1: DRLG 1 sheet (T_Dpth, WOB, RPM)
             # ──────────────────────────────
             ascii1_prn = None
-            if 'DRLG1' in xl.sheet_names:
-                drlg_df = xl.parse('DRLG1', header=None)
+            if 'DRLG 1' in sheet_names:
+                drlg_df = xl.parse('DRLG 1', header=None)
 
-                # Find columns
                 md_col = wob_col = rpm_col = None
+
                 for i in range(len(drlg_df) - 1):
                     for j in range(len(drlg_df.columns)):
                         cell = str(drlg_df.iloc[i, j]).strip().upper()
                         below = str(drlg_df.iloc[i+1, j]).strip().upper()
-                        if ("T_DPTH" in cell or "DEPTH" in cell) and "FT" in below:
-                            md_col = j
-                        if "WOB" in cell and "KLBS" in below:
-                            wob_col = j
-                        if "RPM" in cell and "R/MIN" in below:
-                            rpm_col = j
+
+                        # T_Dpth (or variations)
+                        if any(kw in cell for kw in ["T_DPTH", "T.DPTH", "DEPTH", "T DEPTH", "MEASURED DEPTH"]):
+                            if "FT" in below or below.replace('.', '').isdigit() or below == "":
+                                md_col = j
+
+                        # WOB
+                        if any(kw in cell for kw in ["WOB", "W.O.B", "WEIGHT ON BIT"]):
+                            if "KLBS" in below or below.replace('.', '').isdigit() or below == "":
+                                wob_col = j
+
+                        # RPM
+                        if any(kw in cell for kw in ["RPM", "R/MIN", "ROTARY SPEED", "R/M"]):
+                            if "R/MIN" in below or below.replace('.', '').isdigit() or below == "":
+                                rpm_col = j
 
                 # Fallback: headers alone
                 if md_col is None:
                     for i in range(len(drlg_df)):
                         for j in range(len(drlg_df.columns)):
                             cell = str(drlg_df.iloc[i, j]).strip().upper()
-                            if "T_DPTH" in cell or "DEPTH" in cell:
+                            if any(kw in cell for kw in ["T_DPTH", "T.DPTH", "DEPTH", "T DEPTH", "MEASURED DEPTH"]):
                                 md_col = j
                                 break
                         if md_col is not None:
@@ -440,7 +449,7 @@ with tab_mud_log_ascii:
                     for i in range(len(drlg_df)):
                         for j in range(len(drlg_df.columns)):
                             cell = str(drlg_df.iloc[i, j]).strip().upper()
-                            if "WOB" in cell:
+                            if any(kw in cell for kw in ["WOB", "W.O.B", "WEIGHT ON BIT"]):
                                 wob_col = j
                                 break
                         if wob_col is not None:
@@ -450,7 +459,7 @@ with tab_mud_log_ascii:
                     for i in range(len(drlg_df)):
                         for j in range(len(drlg_df.columns)):
                             cell = str(drlg_df.iloc[i, j]).strip().upper()
-                            if "RPM" in cell:
+                            if any(kw in cell for kw in ["RPM", "R/MIN", "ROTARY SPEED", "R/M"]):
                                 rpm_col = j
                                 break
                         if rpm_col is not None:
@@ -474,13 +483,13 @@ with tab_mud_log_ascii:
 
                     # Generate ASCII 1 PRN
                     ascii1_prn = io.StringIO()
-                    ascii1_prn.write(f"Well: {well_name}\n\n")
-                    ascii1_prn.write(" MD WOB RPM\n")
+                    ascii1_prn.write(f"Well:           {well_name}\n\n")
+                    ascii1_prn.write("  MD    WOB     RPM\n")
                     for _, row in ascii1_data.iterrows():
                         md = int(row['MD'])
                         wob = int(row['WOB'])
                         rpm = int(row['RPM'])
-                        ascii1_prn.write(f" {md:>3} {wob:>3} {rpm:>3}\n")
+                        ascii1_prn.write(f" {md:>3}    {wob:>3}      {rpm:>3}\n")
 
                     # Preview ASCII 1 PRN
                     st.subheader("ASCII 1 PRN Preview")
@@ -493,18 +502,16 @@ with tab_mud_log_ascii:
                         file_name=f"({well_name}) Mud Log ASCII 1.prn",
                         mime="text/plain"
                     )
-            else:
-                st.warning("Sheet 'DRLG 1' not found in Excel.")
 
             # ──────────────────────────────
-            # ASCII 5: GAS 5 sheet
+            # ASCII 5: GAS 5 sheet (T_Dpth, ROP1, T_Gas, C1, C2, C3, IC4, NC4, IC5, NC5)
             # ──────────────────────────────
             ascii5_prn = None
-            if 'GAS5' in xl.sheet_names:
-                gas_df = xl.parse('GAS5', header=None)
+            if 'GAS 5' in xl.sheet_names:
+                gas_df = xl.parse('GAS 5', header=None)
 
-                # Find columns
-                md_col = rop_col = tg_col = c1_col = c2_col = c3_col = ic4_col = nc4_col = c5_col = None
+                md_col = rop_col = tg_col = c1_col = c2_col = c3_col = ic4_col = nc4_col = ic5_col = nc5_col = None
+
                 for i in range(len(gas_df) - 1):
                     for j in range(len(gas_df.columns)):
                         cell = str(gas_df.iloc[i, j]).strip().upper()
@@ -525,8 +532,10 @@ with tab_mud_log_ascii:
                             ic4_col = j
                         if "NC4" in cell and "PPM" in below:
                             nc4_col = j
-                        if "C5" in cell and "PPM" in below:
-                            c5_col = j
+                        if "IC5" in cell and "PPM" in below:
+                            ic5_col = j
+                        if "NC5" in cell and "PPM" in below:
+                            nc5_col = j
 
                 # Fallback: headers alone
                 if md_col is None:
@@ -536,18 +545,17 @@ with tab_mud_log_ascii:
                             if "T_DPTH" in cell or "DEPTH" in cell:
                                 md_col = j
                                 break
-                        if md_col is not None:
+                        if md_col is None:
                             break
 
-                # (Add similar fallback for other columns if needed)
+                # Repeat fallback for rop_col, tg_col, c1_col, c2_col, c3_col, ic4_col, nc4_col, ic5_col, nc5_col...
 
-                if md_col is None or rop_col is None or tg_col is None or c1_col is None or c2_col is None or c3_col is None or ic4_col is None or nc4_col is None or c5_col is None:
+                if md_col is None or rop_col is None or tg_col is None or c1_col is None or c2_col is None or c3_col is None or ic4_col is None or nc4_col is None or ic5_col is None or nc5_col is None:
                     st.error("Could not find all columns for ASCII 5 in 'GAS 5' sheet.")
                 else:
-                    # Data start after header + unit
                     start_row = i + 2
-                    ascii5_data = gas_df.iloc[start_row:, [md_col, rop_col, tg_col, c1_col, c2_col, c3_col, ic4_col, nc4_col, c5_col]].copy()
-                    ascii5_data.columns = ['MD', 'ROP', 'TG', 'C1', 'C2', 'C3', 'C4I', 'C4N', 'C5']
+                    ascii5_data = gas_df.iloc[start_row:, [md_col, rop_col, tg_col, c1_col, c2_col, c3_col, ic4_col, nc4_col, ic5_col, nc5_col]].copy()
+                    ascii5_data.columns = ['MD', 'ROP1', 'T_GAS', 'C1', 'C2', 'C3', 'IC4', 'NC4', 'IC5', 'NC5']
                     ascii5_data = ascii5_data[pd.to_numeric(ascii5_data['MD'], errors='coerce').notnull()]
                     ascii5_data['MD'] = pd.to_numeric(ascii5_data['MD'])
                     for col in ascii5_data.columns[1:]:
@@ -559,19 +567,20 @@ with tab_mud_log_ascii:
 
                     # Generate ASCII 5 PRN
                     ascii5_prn = io.StringIO()
-                    ascii5_prn.write(f"Well: {well_name}\n\n")
-                    ascii5_prn.write(" MD ROP TG C1 C2 C3 C4I C4N C5\n")
+                    ascii5_prn.write(f"Well:           {well_name}\n\n")
+                    ascii5_prn.write("  MD    ROP      TG      C1      C2      C3     IC4     NC4      IC5     NC5\n")
                     for _, row in ascii5_data.iterrows():
                         md = int(row['MD'])
-                        rop = row['ROP']
-                        tg = row['TG']
+                        rop1 = row['ROP1']
+                        t_gas = row['T_GAS']
                         c1 = row['C1']
                         c2 = row['C2']
                         c3 = row['C3']
-                        c4i = row['C4I']
-                        c4n = row['C4N']
-                        c5 = row['C5']
-                        ascii5_prn.write(f" {md:>3} {rop:>5.1f} {tg:>3.0f} {c1:>4.0f} {c2:>4.0f} {c3:>4.0f} {c4i:>4.0f} {c4n:>4.0f} {c5:>4.0f}\n")
+                        ic4 = row['IC4']
+                        nc4 = row['NC4']
+                        ic5 = row['IC5']
+                        nc5 = row['NC5']
+                        ascii5_prn.write(f" {md:>3}   {rop1:>5.1f}     {t_gas:>3.0f}     {c1:>4.0f}     {c2:>4.0f}     {c3:>4.0f}     {ic4:>4.0f}     {nc4:>4.0f}     {ic5:>4.0f}     {nc5:>4.0f}\n")
 
                     # Preview ASCII 5 PRN
                     st.subheader("ASCII 5 PRN Preview")
@@ -594,13 +603,16 @@ with tab_mud_log_ascii:
                     zf.writestr(f"({well_name}) Mud Log ASCII 1.prn", ascii1_prn.getvalue())
                 if ascii5_prn:
                     zf.writestr(f"({well_name}) Mud Log ASCII 5.prn", ascii5_prn.getvalue())
+
             zip_buf.seek(0)
+
             st.download_button(
                 label="Download ZIP (ASCII 1 & 5)",
                 data=zip_buf.getvalue(),
                 file_name=f"({well_name}) Mud Log ASCII 1 & 5.zip",
                 mime="application/zip"
             )
+
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
             st.info("Make sure the file has 'DRLG 1' and 'GAS 5' sheets.")
