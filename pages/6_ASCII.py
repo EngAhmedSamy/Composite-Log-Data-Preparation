@@ -397,13 +397,31 @@ with tab_mud_log_ascii:
 
     if excel_file:
         try:
-            # Load with openpyxl for merged cells and modern .xlsx
-            wb = openpyxl.load_workbook(excel_file, read_only=True, data_only=True)
-            sheet_names = wb.sheetnames
+            xl = pd.ExcelFile(excel_file, engine='xlrd')  # for .xls
 
-            # Use global well name from sidebar
+            # Find well name (search all sheets)
             well_name = st.session_state.get('well_name', 'Unknown Well')
-            st.success(f"**Well Name (from global settings):** {well_name}")
+            found = False
+            for sheet in xl.sheet_names:
+                df = xl.parse(sheet, header=None, engine='xlrd')
+                for i in range(len(df)):
+                    for j in range(len(df.columns)):
+                        cell = str(df.iloc[i, j]).strip().upper()
+                        if 'WELL' in cell:
+                            if j + 1 < len(df.columns) and pd.notna(df.iloc[i, j+1]):
+                                well_name = str(df.iloc[i, j+1]).strip()
+                                found = True
+                            elif i + 1 < len(df) and pd.notna(df.iloc[i+1, j]):
+                                well_name = str(df.iloc[i+1, j]).strip()
+                                found = True
+                            if found:
+                                break
+                    if found:
+                        break
+                if found:
+                    break
+            st.session_state.well_name = well_name
+            st.success(f"**Well Name:** {well_name}")
 
             # ──────────────────────────────
             # ASCII 1: DRLG 1 sheet (MD, WOB, RPM)
