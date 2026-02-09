@@ -559,6 +559,42 @@ if uploaded_file is not None:
                 else:
                     st.warning("No valid numeric data found in GAS 5")
 
+   # Previews
+    if prn1_content:
+        st.subheader("Preview ASCII 1")
+        st.text(prn1_content[:2000] + "..." if len(prn1_content) > 2000 else prn1_content)
+        st.download_button(
+            label="Download ASCII 1 .prn",
+            data=prn1_content,
+            file_name=f"{well_name} Mud Log Ascii 1.prn",
+            mime="text/plain"
+        )
+    
+    if prn5_content:
+        st.subheader("Preview ASCII 5")
+        st.text(prn5_content[:2000] + "..." if len(prn5_content) > 2000 else prn5_content)
+        st.download_button(
+            label="Download ASCII 5 .prn",
+            data=prn5_content,
+            file_name=f"{well_name} Mud Log Ascii 5.prn",
+            mime="text/plain"
+        )
+    
+    if prn1_content and prn5_content:
+        # Create ZIP (as RAR requires additional libs, using ZIP instead)
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
+            zf.writestr(f"{well_name} Mud Log Ascii 5.prn", prn5_content)
+        zip_buffer.seek(0)
+        st.download_button(
+            label="Download Both in ZIP (RAR alternative)",
+            data=zip_buffer,
+            file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
+            mime="application/zip"
+        )
+    
+    
     # ─── Download buttons ────────────────────────────────────────────────────
     if prn1_content:
         st.download_button(
