@@ -516,18 +516,6 @@ if uploaded_file is not None:
                     st.text("\n".join(preview_lines))
 
 
-    # Generate PRN
-                    ascii1_prn = io.StringIO()
-                    ascii1_prn.write(f"Well:           {well_name}\n\n")
-                    ascii1_prn.write("  MD    WOB     RPM\n")
-                    for _, row in ascii1_data.iterrows():
-                        md = int(row['MD'])
-                        wob = int(row['WOB'])
-                        rpm = int(row['RPM'])
-                        ascii1_prn.write(f" {md:>3}    {wob:>3}      {rpm:>3}\n")
-
-                    st.subheader("ASCII 1 PRN Preview")
-                    st.code(ascii1_prn.getvalue(), language="text")
 
     
 
