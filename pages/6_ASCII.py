@@ -409,8 +409,8 @@ with tab_mud_log_ascii:
             # ASCII 1: DRLG 1 sheet (MD, WOB, RPM)
             # ──────────────────────────────
             ascii1_prn = None
-            if 'DRLG 1' in xl.sheet_names:
-                drlg_df = xl.parse('DRLG 1', header=None)
+            if 'DRLG1' in xl.sheet_names:
+                drlg_df = xl.parse('DRLG1', header=None)
 
                 # Find columns
                 md_col = wob_col = rpm_col = None
@@ -500,8 +500,8 @@ with tab_mud_log_ascii:
             # ASCII 5: GAS 5 sheet
             # ──────────────────────────────
             ascii5_prn = None
-            if 'GAS 5' in xl.sheet_names:
-                gas_df = xl.parse('GAS 5', header=None)
+            if 'GAS5' in xl.sheet_names:
+                gas_df = xl.parse('GAS5', header=None)
 
                 # Find columns
                 md_col = rop_col = tg_col = c1_col = c2_col = c3_col = ic4_col = nc4_col = c5_col = None
