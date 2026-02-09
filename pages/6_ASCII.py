@@ -259,7 +259,7 @@ with tab_fm_tops:
 
             # Auto-fill depths (normalize for matching)
             matched = []
-            if 'auto_filled' not in st.session_state or not st.session_state.auto_filled:  # ← check flag to run only once
+            if 'auto_filled' not in st.session_state or not st.session_state.auto_filled:  # run only once
                 for i in range(len(upload_df)):
                     for j in range(len(upload_df.columns)):
                         cell = str(upload_df.iloc[i, j]).strip().lower().replace(" ", "").replace("'", "").replace('"', "")
@@ -277,16 +277,18 @@ with tab_fm_tops:
                                 matched.append(fm)
 
                 if matched:
-                    st.session_state.auto_filled = True  # ← set flag after auto-fill
+                    st.session_state.auto_filled = True
                     st.success(f"Matched and auto-filled {len(matched)} Fm Tops: {', '.join(matched)}. Review below.")
-                    st.rerun()  # ← single rerun to update UI
+                    st.rerun()  # single rerun to update UI immediately
                 else:
                     st.warning("No matching Fm Tops found in Excel. Check names or enter manually.")
+                    st.session_state.auto_filled = True  # still set flag to avoid repeat
+            # Reset flag when new file is uploaded
             else:
-                # Reset flag only if new file uploaded (check file name change)
                 if 'last_excel_name' not in st.session_state or st.session_state.last_excel_name != excel_file.name:
                     st.session_state.auto_filled = False
                     st.session_state.last_excel_name = excel_file.name
+                    st.rerun()  # rerun to reset for new file
         except Exception as e:
             st.error(f"Error reading Excel: {str(e)}")
 
