@@ -262,9 +262,9 @@ with tab_fm_tops:
             current_file_name = excel_file.name if excel_file else None
 
             # Reset auto-fill if new file uploaded
-            if 'last_excel_name' not in st.session_state or st.session_state.last_excel_name != current_file_name:
-                st.session_state.auto_filled = False
-                st.session_state.last_excel_name = current_file_name
+           # if 'last_excel_name' not in st.session_state or st.session_state.last_excel_name != current_file_name:
+          #      st.session_state.auto_filled = False
+          #     st.session_state.last_excel_name = current_file_name
 
             # Run auto-fill only if not done for this file
             if not st.session_state.get('auto_filled', False):
