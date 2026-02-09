@@ -257,6 +257,8 @@ with tab_fm_tops:
                             break
             st.session_state.well_name = well_name
 
+            
+        if excel_file is not None and 'processed_excel' not in st.session_state:
             # Auto-fill depths (normalize for matching: lowercase, no spaces/quotes)
             matched = []
             for i in range(len(upload_df)):
@@ -283,6 +285,10 @@ with tab_fm_tops:
 
         except Exception as e:
             st.error(f"Error reading Excel: {str(e)}")
+
+    st.session_state.processed_excel = True  # flag to run only once per upload
+    st.rerun()
+    
 
     # Input form: checkboxes + MD/TVDSS for each Fm Top
     st.subheader("Select and Edit Fm Tops")
