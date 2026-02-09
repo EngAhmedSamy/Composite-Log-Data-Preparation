@@ -268,7 +268,8 @@ with tab_fm_tops:
                         break
                 st.session_state.well_name = well_name
 
-                           # Auto-fill depths (normalize for matching)
+
+            # Auto-fill depths (normalize for matching)
             matched = []
             current_file_name = excel_file.name
 
@@ -336,8 +337,11 @@ with tab_fm_tops:
             # Show persistent success message if auto-fill already happened
             elif st.session_state.get('matched_tops', []):
                 st.success(f"Matched and auto-filled {len(st.session_state.matched_tops)} Fm Tops: {', '.join(st.session_state.matched_tops)}. Review below.")
-                
 
+
+
+    
+    
     # Input form: checkboxes + MD/TVDSS
     st.subheader("Select and Edit Fm Tops")
     for fm in fm_tops_list:
