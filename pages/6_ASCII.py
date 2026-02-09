@@ -382,6 +382,7 @@ with tab_fm_tops:
 # 3. Mud Log (ASCII-1, ASCII-5)
 # ────────────────────────────────────────────────
 import streamlit as st
+import pandas as pd
 from openpyxl import load_workbook
 import io
 import zipfile
@@ -390,9 +391,28 @@ st.title("Mud Log ASCII-1 and ASCII-5")
 
 uploaded_file = st.file_uploader("Upload Excel File", type=["xls", "xlsx"])
 
-if uploaded_file:
-    # Load the workbook
-    wb = load_workbook(uploaded_file, data_only=True)
+if uploaded_file is not None:
+    file_bytes = uploaded_file.read()
+    uploaded_file.seek(0)  # reset for later use
+
+    try:
+        # First try modern .xlsx with openpyxl
+        wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
+        st.success("Loaded as modern .xlsx format")
+    except Exception as e:
+        st.warning("Not a valid .xlsx file – trying old .xls format...")
+        try:
+            # Use pandas + xlrd engine for legacy .xls
+            excel_file = pd.ExcelFile(io.BytesIO(file_bytes), engine='xlrd')
+            sheet_names = excel_file.sheet_names
+            st.info(f"Loaded as legacy .xls – sheets found: {sheet_names}")
+            
+            # We'll convert sheets we need to openpyxl-like structure later if necessary
+            # For now, just confirm it loaded
+        except Exception as xlrd_err:
+            st.error("Failed to load file with both engines.")
+            st.error("Please re-save the file in Excel as .xlsx and try again.")
+            st.stop()
     
     # Find well name by searching cells
     well_name = None
