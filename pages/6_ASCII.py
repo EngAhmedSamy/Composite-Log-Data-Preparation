@@ -257,7 +257,7 @@ with tab_fm_tops:
                             break
             st.session_state.well_name = well_name
 
-           # Auto-fill depths (normalize for matching)
+         # Auto-fill depths (normalize for matching)
             matched = []
             current_file_name = excel_file.name if excel_file else None
 
