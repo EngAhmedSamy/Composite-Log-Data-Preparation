@@ -232,6 +232,9 @@ with tab_fm_tops:
     if 'fm_tops_data' not in st.session_state:
         st.session_state.fm_tops_data = {fm: {'selected': False, 'MD': 0, 'TVDSS': 0} for fm in fm_tops_list}
 
+    if excel_file is not None and 'processed_excel' not in st.session_state:
+    
+
     # Upload Excel option
     excel_file = st.file_uploader("Upload Fm Tops Excel (optional)", type=["xlsx", "xls"])
     if excel_file:
@@ -258,7 +261,7 @@ with tab_fm_tops:
             st.session_state.well_name = well_name
 
             
-        if excel_file is not None and 'processed_excel' not in st.session_state:
+        
             # Auto-fill depths (normalize for matching: lowercase, no spaces/quotes)
             matched = []
             for i in range(len(upload_df)):
