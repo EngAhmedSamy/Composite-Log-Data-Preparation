@@ -3,6 +3,7 @@ import pandas as pd
 import io
 import re
 import zipfile
+import openpyxl  # for merged cells and better cell access
 
 st.title("6 - ASCII")
 
@@ -395,66 +396,65 @@ with tab_mud_log_ascii:
 
     if excel_file:
         try:
-            # Load workbook with openpyxl to handle merged cells
+            # Load with openpyxl for merged cells and modern .xlsx
             wb = openpyxl.load_workbook(excel_file, read_only=True, data_only=True)
+            sheet_names = wb.sheetnames
 
-            # Use global well name (no search in Excel)
+            # Use global well name from sidebar
             well_name = st.session_state.get('well_name', 'Unknown Well')
-            st.success(f"**Well Name:** {well_name}")
+            st.success(f"**Well Name (from global settings):** {well_name}")
 
             # ──────────────────────────────
-            # ASCII 1: DRLG 1 sheet
+            # ASCII 1: DRLG 1 sheet (MD, WOB, RPM)
             # ──────────────────────────────
             ascii1_prn = None
-            if 'DRLG 1' in wb.sheetnames:
+            if 'DRLG 1' in sheet_names:
                 ws = wb['DRLG 1']
 
-                # Search all cells for headers (case-insensitive, flexible)
                 md_col = wob_col = rpm_col = None
-                md_row = wob_row = rpm_row = None
+
+                depth_keywords = ["MD", "T_DPTH", "T.DPTH", "DEPTH", "T DEPTH", "MEASURED DEPTH", "MD FT"]
+                wob_keywords = ["WOB", "W.O.B", "WEIGHT ON BIT", "WGT ON BIT"]
+                rpm_keywords = ["RPM", "R/MIN", "R/M", "ROTARY SPEED", "RPM (R/MIN)"]
 
                 for row in ws.iter_rows():
                     for cell in row:
                         if cell.value:
                             cell_val = str(cell.value).strip().upper()
 
-                            # Depth/MD
-                            if any(kw in cell_val for kw in ["MD", "T_DPTH", "T.DPTH", "DEPTH", "T DEPTH", "MEASURED DEPTH"]):
-                                # Check below cell for unit or data
+                            # MD / Depth
+                            if any(kw in cell_val for kw in depth_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
-                                if "FT" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
+                                if any(u in below_val for u in ["FT", "FEET", ""]) or below_val.replace('.', '').isdigit():
                                     md_col = cell.column
-                                    md_row = cell.row
 
                             # WOB
-                            if any(kw in cell_val for kw in ["WOB", "W.O.B", "WEIGHT ON BIT"]):
+                            if any(kw in cell_val for kw in wob_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
-                                if "KLBS" in below_val or "LBS" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
+                                if any(u in below_val for u in ["KLBS", "K.LBS", "LBS", ""]) or below_val.replace('.', '').isdigit():
                                     wob_col = cell.column
-                                    wob_row = cell.row
 
                             # RPM
-                            if any(kw in cell_val for kw in ["RPM", "R/MIN", "ROTARY SPEED", "R/M"]):
+                            if any(kw in cell_val for kw in rpm_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
-                                if "R/MIN" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
+                                if any(u in below_val for u in ["R/MIN", "RPM", "R/M", ""]) or below_val.replace('.', '').isdigit():
                                     rpm_col = cell.column
-                                    rpm_row = cell.row
 
                 if md_col is None or wob_col is None or rpm_col is None:
-                    st.error("Could not find all columns (MD, WOB, RPM) in 'DRLG 1' sheet.")
+                    st.error("Could not find MD, WOB, RPM columns in 'DRLG 1' sheet.")
                 else:
-                    # Data start row = max header row + 2 (after unit if present)
-                    start_row = max(md_row, wob_row, rpm_row) + 2
+                    # Data starts after header row + 1 (or +2 if unit row exists)
+                    start_row = max(1, max([cell.row for cell in ws.iter_rows() if cell.column in [md_col, wob_col, rpm_col]])) + 2
 
-                    # Extract data using pandas for convenience
-                    drlg_df = pd.read_excel(excel_file, sheet_name='DRLG 1', header=None)
-                    ascii1_data = drlg_df.iloc[start_row:, [md_col-1, wob_col-1, rpm_col-1]].copy()  # 0-based index for pandas
+                    # Extract using pandas for simplicity
+                    drlg_df = pd.read_excel(excel_file, sheet_name='DRLG 1', header=None, engine='openpyxl')
+                    ascii1_data = drlg_df.iloc[start_row-1:, [md_col-1, wob_col-1, rpm_col-1]].copy()
                     ascii1_data.columns = ['MD', 'WOB', 'RPM']
-                    ascii1_data = ascii1_data[pd.to_numeric(ascii1_data['MD'], errors='coerce').notnull()]
 
+                    ascii1_data = ascii1_data[pd.to_numeric(ascii1_data['MD'], errors='coerce').notnull()]
                     ascii1_data['MD'] = pd.to_numeric(ascii1_data['MD'])
                     ascii1_data['WOB'] = pd.to_numeric(ascii1_data['WOB'])
                     ascii1_data['RPM'] = pd.to_numeric(ascii1_data['RPM'])
@@ -462,7 +462,6 @@ with tab_mud_log_ascii:
                     st.subheader("Extracted ASCII 1 Data (MD, WOB, RPM)")
                     st.dataframe(ascii1_data, use_container_width=True)
 
-                    # Generate ASCII 1 PRN
                     ascii1_prn = io.StringIO()
                     ascii1_prn.write(f"Well:           {well_name}\n\n")
                     ascii1_prn.write("  MD    WOB     RPM\n")
@@ -482,9 +481,6 @@ with tab_mud_log_ascii:
                         mime="text/plain"
                     )
 
-            else:
-                st.warning("Sheet 'DRLG 1' not found in Excel.")
-
             # ──────────────────────────────
             # ASCII 5: GAS 5 sheet
             # ──────────────────────────────
@@ -492,96 +488,84 @@ with tab_mud_log_ascii:
             if 'GAS 5' in wb.sheetnames:
                 ws = wb['GAS 5']
 
-                # Similar search for ASCII 5 columns using openpyxl
                 md_col = rop_col = tg_col = c1_col = c2_col = c3_col = ic4_col = nc4_col = c5_col = None
-                md_row = rop_row = tg_row = c1_row = c2_row = c3_row = ic4_row = nc4_row = c5_row = None
+
+                depth_keywords = ["MD", "T_DPTH", "T.DPTH", "DEPTH", "T DEPTH", "MEASURED DEPTH"]
+                rop_keywords = ["ROP1", "ROP", "RATE OF PENETRATION"]
+                tg_keywords = ["T_GAS", "TG", "TOTAL GAS", "T GAS"]
+                c1_keywords = ["C1", "METHANE"]
+                c2_keywords = ["C2", "ETHANE"]
+                c3_keywords = ["C3", "PROPANE"]
+                ic4_keywords = ["IC4", "I-C4", "ISOBUTANE"]
+                nc4_keywords = ["NC4", "N-C4", "NORMAL BUTANE"]
+                c5_keywords = ["C5", "PENTANE"]
 
                 for row in ws.iter_rows():
                     for cell in row:
                         if cell.value:
                             cell_val = str(cell.value).strip().upper()
 
-                            # Depth/MD
-                            if any(kw in cell_val for kw in ["MD", "T_DPTH", "T.DPTH", "DEPTH", "T DEPTH", "MEASURED DEPTH"]):
+                            if any(kw in cell_val for kw in depth_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
                                 if "FT" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
                                     md_col = cell.column
-                                    md_row = cell.row
 
-                            # ROP1
-                            if any(kw in cell_val for kw in ["ROP1", "ROP", "RATE OF PENETRATION"]):
+                            if any(kw in cell_val for kw in rop_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
                                 if "FT/HR" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
                                     rop_col = cell.column
-                                    rop_row = cell.row
 
-                            # T_GAS
-                            if any(kw in cell_val for kw in ["T_GAS", "TG", "TOTAL GAS"]):
+                            if any(kw in cell_val for kw in tg_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
                                 if "%" in below_val or "PERCENT" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
                                     tg_col = cell.column
-                                    tg_row = cell.row
 
-                            # C1
-                            if any(kw in cell_val for kw in ["C1", "METHANE"]):
+                            if any(kw in cell_val for kw in c1_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
                                 if "PPM" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
                                     c1_col = cell.column
-                                    c1_row = cell.row
 
-                            # C2
-                            if any(kw in cell_val for kw in ["C2", "ETHANE"]):
+                            if any(kw in cell_val for kw in c2_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
                                 if "PPM" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
                                     c2_col = cell.column
-                                    c2_row = cell.row
 
-                            # C3
-                            if any(kw in cell_val for kw in ["C3", "PROPANE"]):
+                            if any(kw in cell_val for kw in c3_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
                                 if "PPM" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
                                     c3_col = cell.column
-                                    c3_row = cell.row
 
-                            # IC4
-                            if any(kw in cell_val for kw in ["IC4", "I-C4", "ISOBUTANE"]):
+                            if any(kw in cell_val for kw in ic4_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
                                 if "PPM" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
                                     ic4_col = cell.column
-                                    ic4_row = cell.row
 
-                            # NC4
-                            if any(kw in cell_val for kw in ["NC4", "N-C4", "NORMAL BUTANE"]):
+                            if any(kw in cell_val for kw in nc4_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
                                 if "PPM" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
                                     nc4_col = cell.column
-                                    nc4_row = cell.row
 
-                            # C5
-                            if any(kw in cell_val for kw in ["C5", "PENTANE"]):
+                            if any(kw in cell_val for kw in c5_keywords):
                                 below_cell = ws.cell(row=cell.row + 1, column=cell.column)
                                 below_val = str(below_cell.value).strip().upper() if below_cell.value else ""
                                 if "PPM" in below_val or below_val.replace('.', '').isdigit() or below_val == "":
                                     c5_col = cell.column
-                                    c5_row = cell.row
 
                 if md_col is None or rop_col is None or tg_col is None or c1_col is None or c2_col is None or c3_col is None or ic4_col is None or nc4_col is None or c5_col is None:
                     st.error("Could not find all columns for ASCII 5 in 'GAS 5' sheet.")
                 else:
-                    # Data start row = max header row + 2
-                    start_row = max(md_row, rop_row, tg_row, c1_row, c2_row, c3_row, ic4_row, nc4_row, c5_row) + 2
+                    start_row = max([cell.row for cell in ws.iter_rows() if cell.column in [md_col, rop_col, tg_col, c1_col, c2_col, c3_col, ic4_col, nc4_col, c5_col] and cell.value]) + 2
 
-                    # Extract using pandas for convenience
-                    gas_df = pd.read_excel(excel_file, sheet_name='GAS 5', header=None)
-                    ascii5_data = gas_df.iloc[start_row:, [md_col-1, rop_col-1, tg_col-1, c1_col-1, c2_col-1, c3_col-1, ic4_col-1, nc4_col-1, c5_col-1]].copy()  # 0-based for pandas
+                    gas_df = pd.read_excel(excel_file, sheet_name='GAS 5', header=None, engine='openpyxl')
+                    ascii5_data = gas_df.iloc[start_row-1:, [md_col-1, rop_col-1, tg_col-1, c1_col-1, c2_col-1, c3_col-1, ic4_col-1, nc4_col-1, c5_col-1]].copy()
                     ascii5_data.columns = ['MD', 'ROP', 'TG', 'C1', 'C2', 'C3', 'C4I', 'C4N', 'C5']
                     ascii5_data = ascii5_data[pd.to_numeric(ascii5_data['MD'], errors='coerce').notnull()]
 
@@ -592,7 +576,6 @@ with tab_mud_log_ascii:
                     st.subheader("Extracted ASCII 5 Data")
                     st.dataframe(ascii5_data, use_container_width=True)
 
-                    # Generate ASCII 5 PRN
                     ascii5_prn = io.StringIO()
                     ascii5_prn.write(f"Well:           {well_name}\n\n")
                     ascii5_prn.write("  MD    ROP      TG      C1      C2      C3     C4I     C4N      C5\n")
@@ -620,7 +603,7 @@ with tab_mud_log_ascii:
 
             # ZIP for both
             zip_buf = io.BytesIO()
-            with zipfile.ZipFile(zip_buf, "w") as zf:
+            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
                 if ascii1_prn:
                     zf.writestr(f"({well_name}) Mud Log ASCII 1.prn", ascii1_prn.getvalue())
                 if ascii5_prn:
@@ -628,16 +611,17 @@ with tab_mud_log_ascii:
 
             zip_buf.seek(0)
 
-            st.download_button(
-                "Download ZIP (ASCII 1 & 5)",
-                zip_buf.getvalue(),
-                file_name=f"({well_name}) Mud Log ASCII 1 & 5.zip",
-                mime="application/zip"
-            )
+            if ascii1_prn or ascii5_prn:
+                st.download_button(
+                    "Download ZIP (ASCII 1 & 5)",
+                    zip_buf.getvalue(),
+                    file_name=f"({well_name}) Mud Log ASCII 1 & 5.zip",
+                    mime="application/zip"
+                )
 
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
-            st.info("Make sure the file has 'DRLG 1' and/or 'GAS 5' sheets.")
+            st.info("Make sure the file is valid and contains 'DRLG 1' and/or 'GAS 5' sheets.")
 
 
 
