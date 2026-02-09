@@ -380,12 +380,308 @@ with tab_fm_tops:
 
 
 
+
 # ────────────────────────────────────────────────
 # 3. Mud Log (ASCII-1, ASCII-5)
 # ────────────────────────────────────────────────
 with tab_mud_log_ascii:
-    st.header("Mud Log ASCII (1 & 5)")
-    st.info("Mud Log ASCII-1 and ASCII-5 preparation coming soon. Typically includes depth, ROP, gas, etc.")
+    st.header("Mud Log (ASCII-1, ASCII-5)")
+
+    excel_file = st.file_uploader("Upload Drilling Parameters Excel", type=["xls", "xlsx"])
+
+    if excel_file:
+        try:
+            xl = pd.ExcelFile(excel_file, engine='xlrd')  # for .xls
+
+            # Find well name (search all sheets)
+            well_name = st.session_state.get('well_name', 'Unknown Well')
+            found = False
+            for sheet in xl.sheet_names:
+                df = xl.parse(sheet, header=None, engine='xlrd')
+                for i in range(len(df)):
+                    for j in range(len(df.columns)):
+                        cell = str(df.iloc[i, j]).strip().upper()
+                        if 'WELL' in cell:
+                            if j + 1 < len(df.columns) and pd.notna(df.iloc[i, j+1]):
+                                well_name = str(df.iloc[i, j+1]).strip()
+                                found = True
+                            elif i + 1 < len(df) and pd.notna(df.iloc[i+1, j]):
+                                well_name = str(df.iloc[i+1, j]).strip()
+                                found = True
+                            if found:
+                                break
+                    if found:
+                        break
+                if found:
+                    break
+            st.session_state.well_name = well_name
+            st.success(f"**Well Name:** {well_name}")
+
+            # ──────────────────────────────
+            # ASCII 1: DRLG 1 sheet (MD, WOB, RPM)
+            # ──────────────────────────────
+            if 'DRLG 1' in xl.sheet_names:
+                drlg_df = xl.parse('DRLG 1', header=None, engine='xlrd')
+
+                # Find columns for ASCII 1 (DRLG 1) - case-insensitive, flexible depth names
+                # ──────────────────────────────
+                md_col = wob_col = rpm_col = None
+
+                depth_keywords = ["MD", "T_DPTH", "T.DPTH", "DEPTH", "T DEPTH", "MEASURED DEPTH", "MD FT"]
+                wob_keywords = ["WOB", "W.O.B", "WEIGHT ON BIT"]
+                rpm_keywords = ["RPM", "R/MIN", "ROTARY SPEED", "R/M"]
+
+                for i in range(len(drlg_df) - 1):
+                    for j in range(len(drlg_df.columns)):
+                        cell = str(drlg_df.iloc[i, j]).strip().upper()
+                        below = str(drlg_df.iloc[i+1, j]).strip().upper()
+
+                        # MD column
+                        if any(kw in cell for kw in depth_keywords) and ("FT" in below or "FEET" in below or below in ["", " "]):
+                            md_col = j
+
+                        # WOB column
+                        if any(kw in cell for kw in wob_keywords) and ("KLBS" in below or "K.LBS" in below or "LBS" in below or below in ["", " "]):
+                            wob_col = j
+
+                        # RPM column
+                        if any(kw in cell for kw in rpm_keywords) and ("R/MIN" in below or "RPM" in below or below in ["", " "]):
+                            rpm_col = j
+
+                # Fallback: headers alone (no unit check)
+                if md_col is None:
+                    for i in range(len(drlg_df)):
+                        for j in range(len(drlg_df.columns)):
+                            cell = str(drlg_df.iloc[i, j]).strip().upper()
+                            if any(kw in cell for kw in depth_keywords):
+                                md_col = j
+                                break
+                        if md_col is not None:
+                            break
+
+                if wob_col is None:
+                    for i in range(len(drlg_df)):
+                        for j in range(len(drlg_df.columns)):
+                            cell = str(drlg_df.iloc[i, j]).strip().upper()
+                            if any(kw in cell for kw in wob_keywords):
+                                wob_col = j
+                                break
+                        if wob_col is not None:
+                            break
+
+                if rpm_col is None:
+                    for i in range(len(drlg_df)):
+                        for j in range(len(drlg_df.columns)):
+                            cell = str(drlg_df.iloc[i, j]).strip().upper()
+                            if any(kw in cell for kw in rpm_keywords):
+                                rpm_col = j
+                                break
+                        if rpm_col is not None:
+                            break
+
+                if md_col is None or wob_col is None or rpm_col is None:
+                    st.error("Could not find all columns (MD, WOB, RPM) in 'DRLG 1' sheet.")
+                else:
+                    # Data start after header + unit
+                    start_row = i + 2
+
+                    ascii1_data = drlg_df.iloc[start_row:, [md_col, wob_col, rpm_col]].copy()
+                    ascii1_data.columns = ['MD', 'WOB', 'RPM']
+                    ascii1_data = ascii1_data[pd.to_numeric(ascii1_data['MD'], errors='coerce').notnull()]
+
+                    ascii1_data['MD'] = pd.to_numeric(ascii1_data['MD'])
+                    ascii1_data['WOB'] = pd.to_numeric(ascii1_data['WOB'])
+                    ascii1_data['RPM'] = pd.to_numeric(ascii1_data['RPM'])
+
+                    # Preview ASCII 1 data
+                    st.subheader("Extracted ASCII 1 Data (MD, WOB, RPM)")
+                    st.dataframe(ascii1_data, use_container_width=True)
+
+                    # Generate ASCII 1 PRN
+                    ascii1_prn = io.StringIO()
+                    ascii1_prn.write(f"Well:           {well_name}\n\n")
+                    ascii1_prn.write("  MD    WOB     RPM\n")
+                    for _, row in ascii1_data.iterrows():
+                        md = int(row['MD'])
+                        wob = int(row['WOB'])
+                        rpm = int(row['RPM'])
+                        ascii1_prn.write(f" {md:>3}    {wob:>3}      {rpm:>3}\n")
+
+                    # Preview ASCII 1 PRN
+                    st.subheader("ASCII 1 PRN Preview")
+                    st.code(ascii1_prn.getvalue(), language="text")
+
+                    # Separate download for ASCII 1
+                    st.download_button(
+                        label="Download Mud Log ASCII 1.prn",
+                        data=ascii1_prn.getvalue(),
+                        file_name=f"({well_name}) Mud Log ASCII 1.prn",
+                        mime="text/plain"
+                    )
+
+            else:
+                st.warning("Sheet 'DRLG 1' not found in Excel.")
+
+            # ──────────────────────────────
+            # ASCII 5: GAS 5 sheet (MD, ROP1, T_GAS, C1, C2, C3, IC4, NC4, C5)
+            # ──────────────────────────────
+            if 'GAS 5' in xl.sheet_names:
+                gas_df = xl.parse('GAS 5', header=None, engine='xlrd')
+
+                # Find columns for ASCII 5 (GAS 5) - case-insensitive, flexible names
+                # ──────────────────────────────
+                md_col = rop_col = tg_col = c1_col = c2_col = c3_col = ic4_col = nc4_col = c5_col = None
+
+                depth_keywords = ["MD", "T_DPTH", "T.DPTH", "DEPTH", "T DEPTH", "MEASURED DEPTH"]
+                rop_keywords = ["ROP1", "ROP", "RATE OF PENETRATION"]
+                tg_keywords = ["T_GAS", "TG", "TOTAL GAS"]
+                c1_keywords = ["C1", "METHANE"]
+                c2_keywords = ["C2", "ETHANE"]
+                c3_keywords = ["C3", "PROPANE"]
+                ic4_keywords = ["IC4", "I-C4", "ISOBUTANE"]
+                nc4_keywords = ["NC4", "N-C4", "NORMAL BUTANE"]
+                c5_keywords = ["C5", "PENTANE"]
+
+                for i in range(len(gas_df) - 1):
+                    for j in range(len(gas_df.columns)):
+                        cell = str(gas_df.iloc[i, j]).strip().upper()
+                        below = str(gas_df.iloc[i+1, j]).strip().upper()
+
+                        # MD
+                        if any(kw in cell for kw in depth_keywords) and ("FT" in below or "FEET" in below or below in ["", " "]):
+                            md_col = j
+
+                        # ROP1
+                        if any(kw in cell for kw in rop_keywords) and ("FT/HR" in below or "FT/H" in below or below in ["", " "]):
+                            rop_col = j
+
+                        # T_Gas
+                        if any(kw in cell for kw in tg_keywords) and ("%" in below or "PERCENT" in below or below in ["", " "]):
+                            tg_col = j
+
+                        # C1
+                        if any(kw in cell for kw in c1_keywords) and ("PPM" in below or below in ["", " "]):
+                            c1_col = j
+
+                        # C2
+                        if any(kw in cell for kw in c2_keywords) and ("PPM" in below or below in ["", " "]):
+                            c2_col = j
+
+                        # C3
+                        if any(kw in cell for kw in c3_keywords) and ("PPM" in below or below in ["", " "]):
+                            c3_col = j
+
+                        # IC4
+                        if any(kw in cell for kw in ic4_keywords) and ("PPM" in below or below in ["", " "]):
+                            ic4_col = j
+
+                        # NC4
+                        if any(kw in cell for kw in nc4_keywords) and ("PPM" in below or below in ["", " "]):
+                            nc4_col = j
+
+                        # C5
+                        if any(kw in cell for kw in c5_keywords) and ("PPM" in below or below in ["", " "]):
+                            c5_col = j
+
+                # Fallback: headers alone (no unit check)
+                if md_col is None:
+                    for i in range(len(gas_df)):
+                        for j in range(len(gas_df.columns)):
+                            cell = str(gas_df.iloc[i, j]).strip().upper()
+                            if any(kw in cell for kw in depth_keywords):
+                                md_col = j
+                                break
+                        if md_col is not None:
+                            break
+
+                # (repeat similar fallback for rop_col, tg_col, c1_col, c2_col, c3_col, ic4_col, nc4_col, c5_col)
+
+                if md_col is None or rop_col is None or tg_col is None or c1_col is None or c2_col is None or c3_col is None or ic4_col is None or nc4_col is None or c5_col is None:
+                    st.error("Could not find all columns for ASCII 5 in 'GAS 5' sheet.")
+                else:
+                    # Data start after header + unit
+                    start_row = i + 2
+
+                    ascii5_data = gas_df.iloc[start_row:, [md_col, rop_col, tg_col, c1_col, c2_col, c3_col, ic4_col, nc4_col, c5_col]].copy()
+                    ascii5_data.columns = ['MD', 'ROP', 'TG', 'C1', 'C2', 'C3', 'C4I', 'C4N', 'C5']
+                    ascii5_data = ascii5_data[pd.to_numeric(ascii5_data['MD'], errors='coerce').notnull()]
+
+                    ascii5_data['MD'] = pd.to_numeric(ascii5_data['MD'])
+                    for col in ascii5_data.columns[1:]:
+                        ascii5_data[col] = pd.to_numeric(ascii5_data[col], errors='coerce').fillna(0)
+
+                    # Preview ASCII 5 data
+                    st.subheader("Extracted ASCII 5 Data")
+                    st.dataframe(ascii5_data, use_container_width=True)
+
+                    # Generate ASCII 5 PRN
+                    ascii5_prn = io.StringIO()
+                    ascii5_prn.write(f"Well:           {well_name}\n\n")
+                    ascii5_prn.write("  MD    ROP      TG      C1      C2      C3     C4I     C4N      C5\n")
+                    for _, row in ascii5_data.iterrows():
+                        md = int(row['MD'])
+                        rop = row['ROP']
+                        tg = row['TG']
+                        c1 = row['C1']
+                        c2 = row['C2']
+                        c3 = row['C3']
+                        c4i = row['C4I']
+                        c4n = row['C4N']
+                        c5 = row['C5']
+                        ascii5_prn.write(f" {md:>3}   {rop:>5.1f}     {tg:>3.0f}     {c1:>4.0f}     {c2:>4.0f}     {c3:>4.0f}     {c4i:>4.0f}     {c4n:>4.0f}     {c5:>4.0f}\n")
+
+                    # Preview ASCII 5 PRN
+                    st.subheader("ASCII 5 PRN Preview")
+                    st.code(ascii5_prn.getvalue(), language="text")
+
+                    # Separate download for ASCII 5
+                    st.download_button(
+                        label="Download Mud Log ASCII 5.prn",
+                        data=ascii5_prn.getvalue(),
+                        file_name=f"({well_name}) Mud Log ASCII 5.prn",
+                        mime="text/plain"
+                    )
+
+                # ──────────────────────────────
+                # ZIP for both ASCII 1 and 5
+                # ──────────────────────────────
+                zip_buf = io.BytesIO()
+                with zipfile.ZipFile(zip_buf, "w") as zf:
+                    zf.writestr(f"({well_name}) Mud Log ASCII 1.prn", ascii1_prn.getvalue())
+                    zf.writestr(f"({well_name}) Mud Log ASCII 5.prn", ascii5_prn.getvalue())
+
+                zip_buf.seek(0)
+
+                st.download_button(
+                    label="Download ZIP (ASCII 1 & 5)",
+                    data=zip_buf.getvalue(),
+                    file_name=f"({well_name}) Mud Log ASCII 1 & 5.zip",
+                    mime="application/zip"
+                )
+
+            else:
+                st.warning("Sheet 'GAS 5' not found in Excel.")
+
+        except Exception as e:
+            st.error(f"Error processing file: {str(e)}")
+            st.info("Make sure the file has 'DRLG 1' and 'GAS 5' sheets.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ────────────────────────────────────────────────
 # 4. Mud & DRLG Parameters
