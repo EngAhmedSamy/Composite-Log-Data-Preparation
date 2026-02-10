@@ -810,7 +810,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, label_width=8, value_width=20)  # ← key line
+                            quoted_text = build_quoted_text(text_parts, label_width=10, value_width=20)  # ← key line
                             data.append((d, quoted_text))
                         except:
                             continue
