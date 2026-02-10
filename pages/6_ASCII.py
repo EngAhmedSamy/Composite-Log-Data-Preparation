@@ -1272,7 +1272,7 @@ with tab_oil_shows:
         st.info("No ranges added yet. Add one above.")
     
     # Generate PRN if ranges exist
-    if st.session_state.oil_ranges:
+    #if st.session_state.oil_ranges:
         if st.button("Generate PRN"):
             # Sort ranges by from_depth
             sorted_ranges = sorted(st.session_state.oil_ranges, key=lambda x: x[0])
