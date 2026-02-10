@@ -704,7 +704,7 @@ with tab_mud_drlg_params:
         drilling_prn = None
         mud_prn = None
         
-        # Load workbook (unchanged)
+        # ─── Load workbook ───────────────────────────────────────────────────────
         try:
             wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="openpyxl")
             sheet_names = wb.sheet_names
@@ -713,17 +713,33 @@ with tab_mud_drlg_params:
             try:
                 wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="xlrd")
                 sheet_names = wb.sheet_names
-                st.warning("Loaded as legacy .xls")
+                st.warning("Loaded as legacy .xls (Excel 97-2003 format)")
             except Exception as e:
-                st.error("Cannot read file.")
+                st.error("Cannot read the file with openpyxl or xlrd.")
+                st.error("Please open in Excel → Save As → .xlsx format and try again.")
                 st.stop()
         
-        # Well name fallback (unchanged)
+        # Well name fallback (if not already set)
         if well_name == 'Unknown Well':
-            # ... your existing well name search ...
-            pass
+            for sheet_name in sheet_names:
+                try:
+                    df_temp = pd.read_excel(wb, sheet_name=sheet_name, header=None, dtype=str)
+                    for _, row in df_temp.iterrows():
+                        for val in row:
+                            if pd.notna(val) and isinstance(val, str) and "WELL:" in val.upper():
+                                parts = val.upper().split("WELL:")
+                                if len(parts) > 1:
+                                    well_name = parts[1].strip().replace("\n", " ").strip()
+                                    st.info(f"Well name detected: **{well_name}**")
+                                    break
+                        if well_name != "Unknown Well":
+                            break
+                except:
+                    continue
+                if well_name != "Unknown Well":
+                    break
         
-        # Find sheets (unchanged, flexible matching)
+        # ─── Find sheets (flexible matching) ─────────────────────────────────────
         drilling_sheet = None
         mud_sheet = None
         for s in sheet_names:
@@ -733,28 +749,33 @@ with tab_mud_drlg_params:
             elif any(word in s_lower for word in ['mud', 'mw', 'vis', 'cl', 'mwt']):
                 mud_sheet = s
         
-        # ─── Helper function to build quoted string ────────────────────────────
-        def build_quoted_text(parts, space_count=10):
+        # ─── Helper function: format parameters in fixed-width columns ──────────
+        def build_fixed_width_text(parts, field_width=22):
+            """
+            Builds one quoted string where each parameter starts at the same position.
+            Example: "WOB: 1-5          RPM: 50+M        SPP: 630-820     GPM: 370        "
+            """
             formatted = []
             i = 0
             while i < len(parts):
                 part = str(parts[i]).strip()
-                if part.endswith(':'):
+                # Label detected
+                if part.endswith(':') or part in ['WOB', 'RPM', 'SPP', 'GPM', 'MWT', 'VIS', 'CL', 'K']:
                     label = part
                     i += 1
                     if i < len(parts):
-                        val = str(parts[i])  # NO strip to preserve spaces in value
-                        formatted.append(label + val)
+                        val = str(parts[i]).strip()
+                        combined = f"{label} {val}"
+                        formatted.append(combined.ljust(field_width))
                         i += 1
                     else:
-                        formatted.append(label)
+                        formatted.append(label.ljust(field_width))
                 else:
-                    formatted.append(str(parts[i]))  # no strip
+                    formatted.append(part.ljust(field_width))
                     i += 1
-            # Join formatted pairs with specified number of spaces
-            spaces = ' ' * space_count
-            return '"' + spaces.join(formatted).strip() + '"'
-
+            # Join without extra spaces (padding already added)
+            return '"' + ''.join(formatted).rstrip() + '"'
+        
         # ─── Process Drilling Parameters ────────────────────────────────────────
         if drilling_sheet:
             try:
@@ -770,16 +791,14 @@ with tab_mud_drlg_params:
                         if depth_v is None and val_str and val_str.replace('.', '', 1).replace('-', '', 1).isdigit():
                             depth_v = val_str
                         elif val_str:
-                            cleaned_text = val_str.replace('\n', ' ').replace('\r', ' ').strip()
-                            if cleaned_text:
-                                text_parts.append(cleaned_text)
+                            cleaned = val_str.replace('\n', ' ').replace('\r', ' ').strip()
+                            if cleaned:
+                                text_parts.append(cleaned)
                     
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            param_text = ' '.join(text_parts)
-                            param_text = param_text.replace(':', ': ')
-                            quoted_text = f'"{param_text}"'
+                            quoted_text = build_fixed_width_text(text_parts, field_width=22)
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -788,15 +807,16 @@ with tab_mud_drlg_params:
                     lines = [f"Well: {well_name}"]
                     for d, quoted in data:
                         d2 = d + 20
-                        line = f"{d:<10}{d2:<10}{quoted}"
+                        line = f"{d:<18}{d2:<18}{quoted}"
                         lines.append(line)
                     drilling_prn = "\n".join(lines) + "\n"
+                else:
+                    st.warning("No valid drilling data found")
             except Exception as e:
                 st.warning(f"Drilling sheet error: {e}")
         
         # ─── Process Mud Parameters ─────────────────────────────────────────────
-        # ─── Process Mud Parameters ─────────────────────────────────────────────
-       if mud_sheet:
+        if mud_sheet:
             try:
                 df = pd.read_excel(wb, sheet_name=mud_sheet, header=None, dtype=str, keep_default_na=False)
                 st.success(f"Mud sheet loaded: {mud_sheet}")
@@ -807,24 +827,17 @@ with tab_mud_drlg_params:
                     text_parts = []
                     for val in row:
                         val_str = str(val).strip()
-                        # Look for depth (first numeric value)
                         if depth_v is None and val_str and val_str.replace('.', '', 1).replace('-', '', 1).isdigit():
                             depth_v = val_str
-                        # Collect text (skip empty)
                         elif val_str:
-                            # Replace internal line breaks with space
-                            cleaned_text = val_str.replace('\n', ' ').replace('\r', ' ').strip()
-                            if cleaned_text:
-                                text_parts.append(cleaned_text)
+                            cleaned = val_str.replace('\n', ' ').replace('\r', ' ').strip()
+                            if cleaned:
+                                text_parts.append(cleaned)
                     
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            # Join all parts with SINGLE space → becomes one line
-                            param_text = ' '.join(text_parts)
-                            # Optional: add extra space around colons if needed
-                            param_text = param_text.replace(':', ': ')
-                            quoted_text = f'"{param_text}"'
+                            quoted_text = build_fixed_width_text(text_parts, field_width=22)
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -833,17 +846,13 @@ with tab_mud_drlg_params:
                     lines = [f"Well: {well_name}"]
                     for d, quoted in data:
                         d2 = d + 20
-                        # Use wider columns for better alignment
                         line = f"{d:<18}{d2:<18}{quoted}"
                         lines.append(line)
                     mud_prn = "\n".join(lines) + "\n"
-                    st.success(f"Mud parameters processed: {len(data)} entries")
                 else:
-                    st.warning("No valid mud data found (check depth and text columns)")
+                    st.warning("No valid mud data found")
             except Exception as e:
-                st.error(f"Mud processing failed: {str(e)}")
-
-        
+                st.warning(f"Mud sheet error: {e}")
         
         # ─── Previews & Downloads ────────────────────────────────────────────────
         if drilling_prn or mud_prn:
@@ -935,7 +944,6 @@ with tab_mud_drlg_params:
                     mime="application/zip",
                     key="mud_drlg_zip"
                 )
-
 
 
 
