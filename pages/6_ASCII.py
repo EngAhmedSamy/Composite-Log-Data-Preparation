@@ -1033,67 +1033,85 @@ with tab_desc_comment:
             'SH': ['sh', 'shale'],
             'LST': ['lst', 'limestone'],
             'DOL': ['dol', 'dolomite'],
-            'OIL SHOWS': ['oil shows', 'oil show', 'w/'],
+            'OIL SHOWS': ['oil shows', 'oil show', 'oil'],
             'SD': ['sd', 'sand']
         }
         
-        # ─── Find and process lithology sheets ───────────────────────────────────
-        for lith_type, keywords in lith_keywords.items():
-            found_sheet = None
-            for s in sheet_names:
-                s_lower = s.lower().strip().replace(' ', '').replace('.', '')
-                if any(kw in s_lower for kw in keywords):
-                    found_sheet = s
+        # ─── Find sheets ─────────────────────────────────────────────────────────
+        lith_sheets = {}  # lith_type -> sheet_name
+        for s in sheet_names:
+            s_lower = s.lower().strip().replace('.', '').replace(' ', '')
+            for lith_type, kws in lith_keywords.items():
+                if any(kw.replace('.', '').replace(' ', '') in s_lower for kw in kws):
+                    lith_sheets[lith_type] = s
                     break
-            
-            if found_sheet:
-                try:
-                    df = pd.read_excel(wb, sheet_name=found_sheet, header=None, dtype=str, keep_default_na=False)
-                    st.success(f"{lith_type} sheet loaded: {found_sheet}")
-                    
-                    # Find depth and description columns
-                    depth_col = None
-                    desc_col = None
-                    for i, row in df.iterrows():
-                        for j, val in enumerate(row):
-                            val_str = str(val).strip()
-                            if val_str.replace('.', '', 1).isdigit() and depth_col is None:
-                                depth_col = j
-                                if j + 1 < len(row):
-                                    desc_col = j + 1
-                                break
-                        if depth_col is not None:
+        
+        # ─── Special handling for OIL SHOWS and SD if no dedicated sheet ─────────
+        sst_sheet = lith_sheets.get('SST')
+        if sst_sheet:
+            # If no OIL SHOWS sheet, search in SST
+            if 'OIL SHOWS' not in lith_sheets:
+                lith_sheets['OIL SHOWS'] = sst_sheet
+            # If no SD sheet, search in SST
+            if 'SD' not in lith_sheets:
+                lith_sheets['SD'] = sst_sheet
+        
+        # ─── Process each lithology ──────────────────────────────────────────────
+        for lith_type, lith_sheet in lith_sheets.items():
+            try:
+                df = pd.read_excel(wb, sheet_name=lith_sheet, header=None, dtype=str, keep_default_na=False)
+                st.success(f"{lith_type} sheet loaded: {lith_sheet}")
+                
+                # Find depth and description columns
+                depth_col = None
+                desc_col = None
+                for i, row in df.iterrows():
+                    for j, val in enumerate(row):
+                        val_str = str(val).strip()
+                        if val_str.replace('.', '', 1).isdigit() and depth_col is None:
+                            depth_col = j
+                            if j + 1 < len(row):
+                                desc_col = j + 1
                             break
-                    
-                    if depth_col is not None and desc_col is not None:
-                        data = []
-                        for _, row in df.iterrows():
-                            depth_v = row.iloc[depth_col]
-                            desc_v = row.iloc[desc_col]
-                            if pd.notna(depth_v) and str(depth_v).strip().replace('.', '', 1).isdigit() and pd.notna(desc_v) and str(desc_v).strip():
-                                try:
-                                    d = int(float(depth_v))
-                                    desc = str(desc_v).replace('\n', ' ').replace('\r', ' ').strip()
-                                    if desc:
-                                        data.append((d, desc))
-                                except:
+                    if depth_col is not None:
+                        break
+                
+                if depth_col is not None and desc_col is not None:
+                    data = []
+                    for _, row in df.iterrows():
+                        depth_v = row.iloc[depth_col]
+                        desc_v = row.iloc[desc_col]
+                        if pd.notna(depth_v) and str(depth_v).strip().replace('.', '', 1).isdigit() and pd.notna(desc_v) and str(desc_v).strip():
+                            desc = str(desc_v).replace('\n', ' ').replace('\r', ' ').strip()
+                            desc_lower = desc.lower()
+                            
+                            # Special filter for OIL SHOWS and SD when in SST sheet
+                            if lith_type in ['OIL SHOWS', 'SD'] and lith_sheet == sst_sheet:
+                                if lith_type == 'OIL SHOWS' and not desc_lower.startswith('w/'):
                                     continue
-                        
-                        if data:
-                            lines = [f"Well: {well_name}"]
-                            for d, desc in data:
-                                d2 = d + 10
-                                line = f"{d:<15}{d2:<15}\"{desc}\""
-                                lines.append(line)
-                            lith_prns[lith_type] = "\n".join(lines) + "\n"
-                        else:
-                            st.warning(f"No valid depth/description data found in {found_sheet}")
+                                if lith_type == 'SD' and not desc_lower.startswith('sd'):
+                                    continue
+                            
+                            try:
+                                d = int(float(depth_v))
+                                if desc:
+                                    data.append((d, desc))
+                            except:
+                                continue
+                    
+                    if data:
+                        lines = [f"Well: {well_name}"]
+                        for d, desc in data:
+                            d2 = d + 10
+                            line = f"{d:<15}{d2:<15}\"{desc}\""
+                            lines.append(line)
+                        lith_prns[lith_type] = "\n".join(lines) + "\n"
                     else:
-                        st.warning(f"Could not find depth/description columns in {found_sheet}")
-                except Exception as e:
-                    st.warning(f"Error reading {found_sheet}: {e}")
-            else:
-                st.info(f"No sheet found for {lith_type}")
+                        st.warning(f"No valid depth/description data for {lith_type} in {lith_sheet}")
+                else:
+                    st.warning(f"No depth/description columns in {lith_sheet} for {lith_type}")
+            except Exception as e:
+                st.warning(f"Error processing {lith_sheet} for {lith_type}: {e}")
         
         # ─── Previews & Downloads ────────────────────────────────────────────────
         if lith_prns:
@@ -1150,7 +1168,6 @@ with tab_desc_comment:
             )
         else:
             st.info("No lithology descriptions found in the uploaded file.")
-
 
 
 
