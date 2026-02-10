@@ -12,6 +12,7 @@ import re
 # Global well name in sidebar
 ## Sidebar - Global Well Name
 # Sidebar
+st.sidebar.markdown("---")
 st.sidebar.header("Global Settings")
 
 well_name_input = st.sidebar.text_input(
