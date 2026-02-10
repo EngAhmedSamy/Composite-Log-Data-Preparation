@@ -967,14 +967,192 @@ with tab_mud_drlg_params:
 # 5. Mud Log DESC Comment (with sub-header for lithology types)
 # ────────────────────────────────────────────────
 with tab_desc_comment:
-    st.header("Mud Log Description Comment")
+    #st.header("Mud Log Description Comment")
+    st.header("Lithology Descriptions")
     st.subheader("This tab is for preparing the Mud Log Description Comments for:")
 
-    lith_types = ["Clay", "Shale", "Sand", "SST", "SLT.ST", "LST", "Oil Shows"]
-    for lit in lith_types:
-        st.markdown(f"- **{lit}**")
+    #lith_types = ["Clay", "Shale", "Sand", "SST", "SLT.ST", "LST", "Oil Shows"]
+    #for lit in lith_types:
+        #st.markdown(f"- **{lit}**")
+    
+    st.info("Upload the lithology Excel file to extract descriptions from SST, SH, LST, etc. sheets.")
+    
+    uploaded_file = st.file_uploader(
+        "Upload Lithology Excel File (.xls or .xlsx)",
+        type=["xls", "xlsx"],
+        key="lithology_uploader"
+    )
+    
+    if uploaded_file is not None:
+        file_bytes = uploaded_file.read()
+        uploaded_file.seek(0)
+        
+        well_name = st.session_state.get('well_name', 'Unknown Well')
+        
+        lith_prns = {}  # lith_type -> prn_content
+        
+        # ─── Load workbook ───────────────────────────────────────────────────────
+        try:
+            wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="openpyxl")
+            sheet_names = wb.sheet_names
+            st.success("Loaded as modern .xlsx")
+        except Exception:
+            try:
+                wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="xlrd")
+                sheet_names = wb.sheet_names
+                st.warning("Loaded as legacy .xls (Excel 97-2003 format)")
+            except Exception as e:
+                st.error("Cannot read the file.")
+                st.stop()
+        
+        # Find well name if not already set
+        if well_name == 'Unknown Well':
+            for sheet_name in sheet_names:
+                try:
+                    df_temp = pd.read_excel(wb, sheet_name=sheet_name, header=None, dtype=str)
+                    for _, row in df_temp.iterrows():
+                        for val in row:
+                            if pd.notna(val) and isinstance(val, str) and "WELL:" in val.upper():
+                                parts = val.upper().split("WELL:")
+                                if len(parts) > 1:
+                                    well_name = parts[1].strip().replace("\n", " ").strip()
+                                    st.info(f"Well name detected: **{well_name}**")
+                                    break
+                        if well_name != "Unknown Well":
+                            break
+                except:
+                    continue
+                if well_name != "Unknown Well":
+                    break
+        
+        # ─── Define lithology types and keywords ─────────────────────────────────
+        lith_keywords = {
+            'SST': ['sst', 's.st'],
+            'CLY': ['cly', 'clay'],
+            'SLTST': ['sltst', 'slt.st', 'siltstone'],
+            'SH': ['sh', 'shale'],
+            'LST': ['lst', 'limestone'],
+            'DOL': ['dol', 'dolomite'],
+            'OIL SHOWS': ['oil shows', 'oil show', 'w/'],
+            'SD': ['sd', 'sand']
+        }
+        
+        # ─── Find and process lithology sheets ───────────────────────────────────
+        for lith_type, keywords in lith_keywords.items():
+            found_sheet = None
+            for s in sheet_names:
+                s_lower = s.lower().strip().replace(' ', '').replace('.', '')
+                if any(kw in s_lower for kw in keywords):
+                    found_sheet = s
+                    break
+            
+            if found_sheet:
+                try:
+                    df = pd.read_excel(wb, sheet_name=found_sheet, header=None, dtype=str, keep_default_na=False)
+                    st.success(f"{lith_type} sheet loaded: {found_sheet}")
+                    
+                    # Find depth and description columns
+                    depth_col = None
+                    desc_col = None
+                    for i, row in df.iterrows():
+                        for j, val in enumerate(row):
+                            val_str = str(val).strip()
+                            if val_str.replace('.', '', 1).isdigit() and depth_col is None:
+                                depth_col = j
+                                if j + 1 < len(row):
+                                    desc_col = j + 1
+                                break
+                        if depth_col is not None:
+                            break
+                    
+                    if depth_col is not None and desc_col is not None:
+                        data = []
+                        for _, row in df.iterrows():
+                            depth_v = row.iloc[depth_col]
+                            desc_v = row.iloc[desc_col]
+                            if pd.notna(depth_v) and str(depth_v).strip().replace('.', '', 1).isdigit() and pd.notna(desc_v) and str(desc_v).strip():
+                                try:
+                                    d = int(float(depth_v))
+                                    desc = str(desc_v).replace('\n', ' ').replace('\r', ' ').strip()
+                                    if desc:
+                                        data.append((d, desc))
+                                except:
+                                    continue
+                        
+                        if data:
+                            lines = [f"Well: {well_name}"]
+                            for d, desc in data:
+                                d2 = d + 10
+                                line = f"{d:<15}{d2:<15}\"{desc}\""
+                                lines.append(line)
+                            lith_prns[lith_type] = "\n".join(lines) + "\n"
+                        else:
+                            st.warning(f"No valid depth/description data found in {found_sheet}")
+                    else:
+                        st.warning(f"Could not find depth/description columns in {found_sheet}")
+                except Exception as e:
+                    st.warning(f"Error reading {found_sheet}: {e}")
+            else:
+                st.info(f"No sheet found for {lith_type}")
+        
+        # ─── Previews & Downloads ────────────────────────────────────────────────
+        if lith_prns:
+            st.markdown("---")
+            
+            for lith_type, lith_prn in lith_prns.items():
+                st.subheader(f"{lith_type} Description PRN Preview (scroll to see full content - copy-paste ready)")
+                st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
+                
+                with st.container():
+                    st.markdown(
+                        f"""
+                        <div style="
+                            height: 400px;
+                            overflow-y: auto;
+                            overflow-x: auto;
+                            background-color: #1e1e1e;
+                            color: #d4d4d4;
+                            font-family: 'Courier New', Courier, monospace;
+                            font-size: 14px;
+                            padding: 16px;
+                            border-radius: 6px;
+                            border: 1px solid #444;
+                            white-space: pre;
+                            line-height: 1.4;
+                        ">
+                        {lith_prn.replace("\n", "<br>").replace(" ", "&nbsp;")}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                
+                st.download_button(
+                    label=f"Download {lith_type} Description .prn",
+                    data=lith_prn,
+                    file_name=f"{well_name} {lith_type} Description.prn",
+                    mime="text/plain",
+                    key=f"lith_download_{lith_type.lower().replace(' ', '_')}"
+                )
+            
+            # ZIP all lithology PRNs
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                for lith_type, lith_prn in lith_prns.items():
+                    zf.writestr(f"{well_name} {lith_type} Description.prn", lith_prn)
+            zip_buffer.seek(0)
+            
+            st.download_button(
+                label="Download ZIP (All Lithology Descriptions)",
+                data=zip_buffer,
+                file_name=f"{well_name} All Lithology Descriptions.zip",
+                mime="application/zip",
+                key="lith_zip_all"
+            )
+        else:
+            st.info("No lithology descriptions found in the uploaded file.")
 
-    st.info("Description comment preparation coming soon. Will support multi-line text input per type, depth association, and formatted ASCII/PRN output.")
+
+
 
 # ────────────────────────────────────────────────
 # 6. Oil Shows Intensity
