@@ -750,7 +750,7 @@ with tab_mud_drlg_params:
                 mud_sheet = s
         
         # ─── Helper function: format parameters in fixed-width columns ──────────
-        def build_quoted_text(parts, label_width=8, value_width=12):
+        def build_quoted_text(parts, label_width=8, value_width=20):
             """
             Builds a quoted string with fixed-width fields for each parameter.
             - label_width: width for label (WOB:, MWT:, etc.)
@@ -810,7 +810,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, label_width=8, value_width=12)  # ← key line
+                            quoted_text = build_quoted_text(text_parts, label_width=8, value_width=20)  # ← key line
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -849,7 +849,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, label_width=8, value_width=12)  # ← same width
+                            quoted_text = build_quoted_text(text_parts, label_width=8, value_width=20)  # ← same width
                             data.append((d, quoted_text))
                         except:
                             continue
