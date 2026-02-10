@@ -817,7 +817,7 @@ with tab_mud_drlg_params:
                     lines = [f"Well: {well_name}"]
                     for d, quoted in data:
                         d2 = d + 20
-                        line = f"{d:<7}{d2:<7}{quoted}"
+                        line = f"{d:<5}{d2:<5}{quoted}"
                         lines.append(line)
                     mud_prn = "\n".join(lines) + "\n"
             except Exception as e:
