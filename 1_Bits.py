@@ -9,20 +9,29 @@ import pytesseract
 import re
 
 
-# Sidebar watermark (always visible)
-with st.sidebar:
-    st.markdown("---")
-    st.markdown(
-        """
-        <div style="text-align: center; color: #aaa; font-size: 0.85rem; padding: 10px 0;">
-            © 2026 Ahmed Samy<br>
-            Composite Log Data Preparation App<br>
-            Proprietary – All Rights Reserved<br>
-            Private Use Only – Do Not Distribute
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+# ─── Sidebar Copyright / Watermark Footer (visible on ALL pages) ──────────
+st.sidebar.markdown("...")
+st.sidebar.markdown("---")  # separator line above the copyright
+
+st.sidebar.markdown(
+    """
+    <div style="
+        text-align: center; 
+        color: #888; 
+        font-size: 0.85rem; 
+        padding: 12px 8px; 
+        margin-top: auto;
+        border-top: 1px solid #444;
+    ">
+        © 2026 Ahmed Samy<br>
+        Composite Log Data Preparation App<br>
+        Proprietary Software – All Rights Reserved<br>
+        Private Property – For internal use only<br>
+        Copyright protected – Do not distribute
+    </div>
+    """,
+    unsafe_allow_html=True
+)
     
 # Global well name in sidebar
 ## Sidebar - Global Well Name
