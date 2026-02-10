@@ -514,24 +514,30 @@ with tab_mud_log_ascii:
                     if idx is not None:
                         gas_cols.append((name, idx))
                 # Assume order C1 C2 C3 C4I C4N C5
-                if depth_col and rop_col and tg_col and len(gas_cols) >= 6:
-                    data = []
-                    for _, row in df_data.iterrows():
-                        values = []
-                        md_v = row.iloc[depth_col]
-                        if pd.notna(md_v) and md_v != '':
-                            try:
-                                values.append(float(md_v))
-                                rop = float(row.iloc[rop_col]) if pd.notna(row.iloc[rop_col]) else 0.0
-                                values.append(rop)
-                                tg = float(row.iloc[tg_col]) if pd.notna(row.iloc[tg_col]) else 0.0
-                                values.append(tg)
-                                for _, idx in gas_cols[:6]:
-                                    vv = float(row.iloc[idx]) if pd.notna(row.iloc[idx]) else 0.0
-                                    values.append(vv)
-                                data.append(values)
-                            except:
-                                continue
+                if depth_col is not None and rop_col is not None and tg_col is not None and len(gas_cols) >= 6:
+                data = []
+                for _, row in df_data.iterrows():
+                    values = []
+                    md_v = row.iloc[depth_col]
+                    if pd.notna(md_v) and md_v != '':
+                        try:
+                            values.append(float(md_v))
+                            rop_v = row.iloc[rop_col]
+                            rop = float(rop_v) if pd.notna(rop_v) and rop_v != '' else 0.0
+                            if math.isnan(rop): rop = 0.0
+                            values.append(rop)
+                            tg_v = row.iloc[tg_col]
+                            tg = float(tg_v) if pd.notna(tg_v) and tg_v != '' else 0.0
+                            if math.isnan(tg): tg = 0.0
+                            values.append(tg)
+                            for _, idx in gas_cols[:6]:  # take first 6
+                                v = row.iloc[idx]
+                                vv = float(v) if pd.notna(v) and v != '' else 0.0
+                                if math.isnan(vv): vv = 0.0
+                                values.append(vv)
+                            data.append(values)
+                        except (ValueError, TypeError):
+                            continue
                     if data:
                         prn5_content = f" Well:           {well_name}\n   MD     ROP      TG      C1      C2      C3     C4I     C4N      C5\n" + "\n".join(f"   {int(v[0])}    {v[1]:.1f}     {int(v[2])}       {int(v[3])}       {int(v[4])}       {int(v[5])}       {int(v[6])}       {int(v[7])}       {int(v[8])}" for v in data) + "\n"
 
@@ -580,6 +586,7 @@ with tab_mud_log_ascii:
         if prn5_content:
             st.subheader("ASCII 5 PRN Preview (scroll to see full content - copy-paste ready)")
             st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
+            
             with st.container():
                 st.markdown(
                     f"""
