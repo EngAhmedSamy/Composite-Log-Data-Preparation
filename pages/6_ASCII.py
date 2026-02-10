@@ -689,7 +689,7 @@ with tab_mud_log_ascii:
 with tab_mud_drlg_params:
     st.header("Mud & Drilling Parameters")
     
-    uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"], key="uploader_mud_drlg_params")
+    uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"])
     
     if uploaded_file is not None:
         file_bytes = uploaded_file.read()
@@ -740,9 +740,9 @@ with tab_mud_drlg_params:
         mud_sheet = None
         for s in sheet_names:
             s_lower = s.lower()
-            if s_lower.startswith("drilling"):
+            if 'drilling' in s_lower:
                 drilling_sheet = s
-            elif s_lower.startswith("mud"):
+            elif 'mud' in s_lower:
                 mud_sheet = s
         
         # Process Drilling sheet
@@ -751,39 +751,36 @@ with tab_mud_drlg_params:
                 df_drlg = pd.read_excel(wb, sheet_name=drilling_sheet, header=None, dtype=str, keep_default_na=False)
                 st.success(f"Drilling sheet loaded: {drilling_sheet}")
                 
-                # Find columns: numeric depth and text parameters
-                depth_col = text_col = None
-                for i, row in df_drlg.iterrows():
+                # Find rows with numeric depth in first columns
+                data = []
+                for _, row in df_drlg.iterrows():
+                    depth_v = None
                     for j, val in enumerate(row):
-                        if str(val).strip().isdigit() or (isinstance(val, str) and re.match(r'^\d+$', val.strip())):
-                            depth_col = j
-                            if j + 1 < len(row) and isinstance(row[j+1], str) and row[j+1].strip():
-                                text_col = j + 1
-                                break
-                    if depth_col is not None:
-                        break
+                        val_str = str(val).strip()
+                        if val_str.isdigit():
+                            depth_v = val_str
+                            # Concatenate all subsequent non-empty cells with spaces
+                            text_parts = []
+                            for k in range(j + 1, len(row)):
+                                part = str(row[k]).strip()
+                                if part:
+                                    text_parts.append(part)
+                            t = '             '.join(text_parts)  # join with multiple spaces for alignment
+                            break
+                    if depth_v and t:
+                        try:
+                            d = int(depth_v)
+                            data.append((d, t))
+                        except:
+                            continue
                 
-                if depth_col is not None and text_col is not None:
-                    data = []
-                    for _, row in df_drlg.iterrows():
-                        depth_v = row.iloc[depth_col]
-                        text_v = row.iloc[text_col]
-                        if pd.notna(depth_v) and depth_v != '' and pd.notna(text_v) and text_v != '':
-                            try:
-                                d = int(float(depth_v))
-                                t = text_v.strip()
-                                if t:
-                                    data.append((d, t))
-                            except:
-                                continue
-                    
-                    if data:
-                        lines = [f"Well: {well_name}"]
-                        for d, t in data:
-                            d2 = d + 20
-                            line = f"{d:<15} {d2:<15} \"{t}\""
-                            lines.append(line)
-                        drilling_prn = "\n".join(lines) + "\n"
+                if data:
+                    lines = [f"Well: {well_name}"]
+                    for d, t in data:
+                        d2 = d + 20
+                        line = f"{d:<15}{d2:<15}\"{t}\""
+                        lines.append(line)
+                    drilling_prn = "\n".join(lines) + "\n"
             except Exception as e:
                 st.warning(f"Could not process Drilling sheet: {e}")
         
@@ -793,38 +790,34 @@ with tab_mud_drlg_params:
                 df_mud = pd.read_excel(wb, sheet_name=mud_sheet, header=None, dtype=str, keep_default_na=False)
                 st.success(f"Mud sheet loaded: {mud_sheet}")
                 
-                depth_col = text_col = None
-                for i, row in df_mud.iterrows():
+                data = []
+                for _, row in df_mud.iterrows():
+                    depth_v = None
                     for j, val in enumerate(row):
-                        if str(val).strip().isdigit() or (isinstance(val, str) and re.match(r'^\d+$', val.strip())):
-                            depth_col = j
-                            if j + 1 < len(row) and isinstance(row[j+1], str) and row[j+1].strip():
-                                text_col = j + 1
-                                break
-                    if depth_col is not None:
-                        break
+                        val_str = str(val).strip()
+                        if val_str.isdigit():
+                            depth_v = val_str
+                            text_parts = []
+                            for k in range(j + 1, len(row)):
+                                part = str(row[k]).strip()
+                                if part:
+                                    text_parts.append(part)
+                            t = '             '.join(text_parts)
+                            break
+                    if depth_v and t:
+                        try:
+                            d = int(depth_v)
+                            data.append((d, t))
+                        except:
+                            continue
                 
-                if depth_col is not None and text_col is not None:
-                    data = []
-                    for _, row in df_mud.iterrows():
-                        depth_v = row.iloc[depth_col]
-                        text_v = row.iloc[text_col]
-                        if pd.notna(depth_v) and depth_v != '' and pd.notna(text_v) and text_v != '':
-                            try:
-                                d = int(float(depth_v))
-                                t = text_v.strip()
-                                if t:
-                                    data.append((d, t))
-                            except:
-                                continue
-                    
-                    if data:
-                        lines = [f"Well: {well_name}"]
-                        for d, t in data:
-                            d2 = d + 20
-                            line = f"{d:<15} {d2:<15} \"{t}\""
-                            lines.append(line)
-                        mud_prn = "\n".join(lines) + "\n"
+                if data:
+                    lines = [f"Well: {well_name}"]
+                    for d, t in data:
+                        d2 = d + 20
+                        line = f"{d:<15}{d2:<15}\"{t}\""
+                        lines.append(line)
+                    mud_prn = "\n".join(lines) + "\n"
             except Exception as e:
                 st.warning(f"Could not process Mud sheet: {e}")
         
