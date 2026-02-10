@@ -1046,13 +1046,39 @@ with tab_desc_comment:
                     lith_sheets[lith_type] = s
                     break
         
-        # ─── Special handling: OIL SHOWS and SD fall back to SST if no dedicated sheet ─────────
+        # ─── Special handling for OIL SHOWS and SD ────────────────────────────────
         sst_sheet = lith_sheets.get('SST')
-        if sst_sheet:
-            if 'OIL SHOWS' not in lith_sheets:
+        oil_shows_sheet = lith_sheets.get('OIL SHOWS')
+        
+        # For OIL SHOWS: validate if dedicated sheet is correct (has "w/" descriptions)
+        if oil_shows_sheet:
+            # Check if it has descriptions starting with "w/"
+            try:
+                df_oil = pd.read_excel(wb, sheet_name=oil_shows_sheet, header=None, dtype=str)
+                has_w_desc = False
+                for _, row in df_oil.iterrows():
+                    for val in row:
+                        val_str = str(val).strip().lower()
+                        if val_str.startswith('w/'):
+                            has_w_desc = True
+                            break
+                    if has_w_desc:
+                        break
+                
+                if not has_w_desc:
+                    st.warning(f"OIL SHOWS sheet '{oil_shows_sheet}' does not contain descriptions starting with 'w/' – falling back to SST.")
+                    lith_sheets['OIL SHOWS'] = sst_sheet
+            except:
+                st.warning(f"Error checking OIL SHOWS sheet – falling back to SST.")
                 lith_sheets['OIL SHOWS'] = sst_sheet
-            if 'SD' not in lith_sheets:
-                lith_sheets['SD'] = sst_sheet
+        else:
+            # No dedicated sheet – assign to SST
+            if sst_sheet:
+                lith_sheets['OIL SHOWS'] = sst_sheet
+        
+        # For SD: if no dedicated sheet, assign to SST
+        if 'SD' not in lith_sheets and sst_sheet:
+            lith_sheets['SD'] = sst_sheet
         
         # ─── Process each lithology ──────────────────────────────────────────────
         for lith_type, lith_sheet in lith_sheets.items():
