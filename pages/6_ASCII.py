@@ -575,34 +575,53 @@ if uploaded_file is not None:
                     st.text("\n".join(preview_lines))
 
     # ─── Download buttons ────────────────────────────────────────────────────
-    if prn1_content:
-        st.download_button(
-            "Download ASCII 1 .prn",
-            prn1_content,
-            file_name=f"{well_name} Mud Log Ascii 1.prn",
-            mime="text/plain"
-        )
+    # ─── ASCII 1 Preview ─────────────────────────────────────────────────────
+if prn1_content:
+    st.subheader("ASCII 1 PRN Preview (full content - copy-paste ready)")
 
-    if prn5_content:
-        st.download_button(
-            "Download ASCII 5 .prn",
-            prn5_content,
-            file_name=f"{well_name} Mud Log Ascii 5.prn",
-            mime="text/plain"
-        )
+    st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
+    # Show the complete content in a monospaced code block
+    st.code(prn1_content, language="text")
+    
+    st.download_button(
+        label="Download Mud Log Ascii 1.prn",
+        data=prn1_content,
+        file_name=f"{well_name} Mud Log Ascii 1.prn",
+        mime="text/plain",
+        key="download_ascii1"
+    )
 
-    if prn1_content and prn5_content:
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
-            zf.writestr(f"{well_name} Mud Log Ascii 5.prn", prn5_content)
-        zip_buffer.seek(0)
-        st.download_button(
-            "Download Both (ZIP)",
-            zip_buffer,
-            file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
-            mime="application/zip"
-        )
+# ─── ASCII 5 Preview ─────────────────────────────────────────────────────
+if prn5_content:
+    st.subheader("ASCII 5 PRN Preview (full content - copy-paste ready)")
+
+    st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
+    # Show the complete content in a monospaced code block
+    st.code(prn5_content, language="text")
+    
+    st.download_button(
+        label="Download Mud Log Ascii 5.prn",
+        data=prn5_content,
+        file_name=f"{well_name} Mud Log Ascii 5.prn",
+        mime="text/plain",
+        key="download_ascii5"
+    )
+
+# ─── Combined ZIP Download ───────────────────────────────────────────────
+if prn1_content and prn5_content:
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
+        zf.writestr(f"{well_name} Mud Log Ascii 5.prn", prn5_content)
+    zip_buffer.seek(0)
+    
+    st.download_button(
+        label="Download ZIP (Ascii 1 & 5)",
+        data=zip_buffer,
+        file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
+        mime="application/zip",
+        key="download_zip_both"
+    )
 
 
 
