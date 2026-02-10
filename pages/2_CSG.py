@@ -8,7 +8,7 @@ import pytesseract
 import re
 from pdf2image import convert_from_bytes
 
-
+st.sidebar.markdown("---")
 st.sidebar.header("Global Settings")
 
 well_name_input = st.sidebar.text_input(
@@ -30,7 +30,7 @@ if st.sidebar.button("Apply Well Name", type="primary"):
 
 # ─── Sidebar Copyright / Watermark Footer (visible on ALL pages) ──────────
 #st.sidebar.markdown("---")  # separator line above the copyright
-
+st.sidebar.markdown("---")
 st.sidebar.markdown(
     """
     <div style="
