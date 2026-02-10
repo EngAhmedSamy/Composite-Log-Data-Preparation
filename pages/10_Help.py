@@ -1,3 +1,5 @@
+import streamlit as st
+
 # ─── Sidebar Copyright / Watermark Footer (visible on ALL pages) ──────────
 #st.sidebar.markdown("---")  # separator line above the copyright
 st.sidebar.markdown("---")
