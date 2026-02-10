@@ -750,30 +750,37 @@ with tab_mud_drlg_params:
                 mud_sheet = s
         
         # ─── Helper function: format parameters in fixed-width columns ──────────
-        def build_fixed_width_text(parts, field_width=22):
+        def build_quoted_text(parts, field_width=22):
             """
-            Builds one quoted string where each parameter starts at the same position.
-            Example: "WOB: 1-5          RPM: 50+M        SPP: 630-820     GPM: 370        "
+            Builds a quoted string where EVERY parameter starts at the same column position.
+            Each parameter (label + value) is padded to exactly 'field_width' characters.
+            Values are right-aligned within their field for nice decimal alignment.
             """
             formatted = []
             i = 0
             while i < len(parts):
                 part = str(parts[i]).strip()
-                # Label detected
-                if part.endswith(':') or part in ['WOB', 'RPM', 'SPP', 'GPM', 'MWT', 'VIS', 'CL', 'K']:
+                
+                # Detect label (ends with : or known keyword)
+                if part.endswith(':') or part.upper() in ['WOB', 'RPM', 'SPP', 'GPM', 'MWT', 'VIS', 'CL', 'K']:
                     label = part
                     i += 1
+                    value = ""
                     if i < len(parts):
-                        val = str(parts[i]).strip()
-                        combined = f"{label} {val}"
-                        formatted.append(combined.ljust(field_width))
+                        value = str(parts[i]).strip()
                         i += 1
-                    else:
-                        formatted.append(label.ljust(field_width))
+                    
+                    # Format: label + value, value right-aligned in remaining space
+                    combined = f"{label} {value}"
+                    # Pad to fixed width (left-align whole thing)
+                    formatted.append(combined.ljust(field_width))
+                
                 else:
+                    # Standalone value or text → pad to width
                     formatted.append(part.ljust(field_width))
                     i += 1
-            # Join without extra spaces (padding already added)
+            
+            # Join all fixed-width fields → no extra spaces needed
             return '"' + ''.join(formatted).rstrip() + '"'
         
         # ─── Process Drilling Parameters ────────────────────────────────────────
@@ -798,7 +805,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_fixed_width_text(text_parts, field_width=22)
+                            quoted_text = build_quoted_text(text_parts, field_width=22)  # ← key line
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -837,7 +844,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_fixed_width_text(text_parts, field_width=22)
+                            quoted_text = build_quoted_text(text_parts, field_width=22)  # ← same width
                             data.append((d, quoted_text))
                         except:
                             continue
