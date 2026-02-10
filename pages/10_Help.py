@@ -32,3 +32,19 @@ st.markdown("### Tab 10: Help (How to use the app ?!)")
 
 st.info("Streamlit application for preparing Petrel-ready Composite Log data.")
 st.info("Detailed Manual for using the app is coming up soon!")
+
+
+
+# Add footer at end of each tab if needed
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style="text-align: center; color: #888; font-size: 0.9rem; padding: 12px 0;">
+            © 2026 Ahmed Samy / Composite Log Data Preparation App – Proprietary Software<br>
+            All Rights Reserved – Private Property – For internal use only
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
