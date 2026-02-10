@@ -785,7 +785,7 @@ with tab_mud_drlg_params:
                         d2 = d + 20
                         line = f"{d:<10}{d2:<10}{quoted}"
                         lines.append(line)
-                    drilling_prn = "\n".join(lines) + "\n"
+                    drilling_prn = "\n".join(lines) 
             except Exception as e:
                 st.warning(f"Drilling sheet error: {e}")
         
