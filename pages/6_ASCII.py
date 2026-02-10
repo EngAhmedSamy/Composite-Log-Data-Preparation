@@ -681,12 +681,248 @@ with tab_mud_log_ascii:
 
 
 
+
+
 # ────────────────────────────────────────────────
 # 4. Mud & DRLG Parameters
 # ────────────────────────────────────────────────
 with tab_mud_drlg_params:
     st.header("Mud & Drilling Parameters")
-    st.info("Mud properties and drilling parameters preparation coming soon.")
+    
+    uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"])
+    
+    if uploaded_file is not None:
+        file_bytes = uploaded_file.read()
+        uploaded_file.seek(0)
+        
+        well_name = st.session_state.get('well_name', 'Unknown Well')
+        
+        drilling_prn = None
+        mud_prn = None
+        
+        # ─── Try modern .xlsx first ──────────────────────────────────────────────
+        try:
+            wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="openpyxl")
+            sheet_names = wb.sheet_names
+            st.success("Loaded as modern .xlsx")
+        except Exception:
+            try:
+                wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="xlrd")
+                sheet_names = wb.sheet_names
+                st.warning("Loaded as legacy .xls (Excel 97-2003 format)")
+            except Exception as e:
+                st.error("Cannot read the file with openpyxl or xlrd.")
+                st.error("Please open in Excel → Save As → .xlsx format and try again.")
+                st.stop()
+        
+        # Find well name if not in session (search all sheets)
+        if well_name == 'Unknown Well':
+            for sheet_name in sheet_names:
+                try:
+                    df_temp = pd.read_excel(wb, sheet_name=sheet_name, header=None, dtype=str)
+                    for _, row in df_temp.iterrows():
+                        for val in row:
+                            if pd.notna(val) and isinstance(val, str) and "WELL:" in val.upper():
+                                parts = val.upper().split("WELL:")
+                                if len(parts) > 1:
+                                    well_name = parts[1].strip().replace("\n", " ").strip()
+                                    st.info(f"Well name detected: **{well_name}**")
+                                    break
+                        if well_name != "Unknown Well":
+                            break
+                except:
+                    continue
+                if well_name != "Unknown Well":
+                    break
+        
+        # Find sheets for drilling and mud
+        drilling_sheet = None
+        mud_sheet = None
+        for s in sheet_names:
+            s_lower = s.lower()
+            if s_lower.startswith("drilling"):
+                drilling_sheet = s
+            elif s_lower.startswith("mud"):
+                mud_sheet = s
+        
+        # Process Drilling sheet
+        if drilling_sheet:
+            try:
+                df_drlg = pd.read_excel(wb, sheet_name=drilling_sheet, header=None, dtype=str, keep_default_na=False)
+                st.success(f"Drilling sheet loaded: {drilling_sheet}")
+                
+                # Find columns: numeric depth and text parameters
+                depth_col = text_col = None
+                for i, row in df_drlg.iterrows():
+                    for j, val in enumerate(row):
+                        if str(val).strip().isdigit() or (isinstance(val, str) and re.match(r'^\d+$', val.strip())):
+                            depth_col = j
+                            if j + 1 < len(row) and isinstance(row[j+1], str) and row[j+1].strip():
+                                text_col = j + 1
+                                break
+                    if depth_col is not None:
+                        break
+                
+                if depth_col is not None and text_col is not None:
+                    data = []
+                    for _, row in df_drlg.iterrows():
+                        depth_v = row.iloc[depth_col]
+                        text_v = row.iloc[text_col]
+                        if pd.notna(depth_v) and depth_v != '' and pd.notna(text_v) and text_v != '':
+                            try:
+                                d = int(float(depth_v))
+                                t = text_v.strip()
+                                if t:
+                                    data.append((d, t))
+                            except:
+                                continue
+                    
+                    if data:
+                        lines = [f"Well: {well_name}"]
+                        for d, t in data:
+                            d2 = d + 20
+                            line = f"{d:<15} {d2:<15} \"{t}\""
+                            lines.append(line)
+                        drilling_prn = "\n".join(lines) + "\n"
+            except Exception as e:
+                st.warning(f"Could not process Drilling sheet: {e}")
+        
+        # Process Mud sheet
+        if mud_sheet:
+            try:
+                df_mud = pd.read_excel(wb, sheet_name=mud_sheet, header=None, dtype=str, keep_default_na=False)
+                st.success(f"Mud sheet loaded: {mud_sheet}")
+                
+                depth_col = text_col = None
+                for i, row in df_mud.iterrows():
+                    for j, val in enumerate(row):
+                        if str(val).strip().isdigit() or (isinstance(val, str) and re.match(r'^\d+$', val.strip())):
+                            depth_col = j
+                            if j + 1 < len(row) and isinstance(row[j+1], str) and row[j+1].strip():
+                                text_col = j + 1
+                                break
+                    if depth_col is not None:
+                        break
+                
+                if depth_col is not None and text_col is not None:
+                    data = []
+                    for _, row in df_mud.iterrows():
+                        depth_v = row.iloc[depth_col]
+                        text_v = row.iloc[text_col]
+                        if pd.notna(depth_v) and depth_v != '' and pd.notna(text_v) and text_v != '':
+                            try:
+                                d = int(float(depth_v))
+                                t = text_v.strip()
+                                if t:
+                                    data.append((d, t))
+                            except:
+                                continue
+                    
+                    if data:
+                        lines = [f"Well: {well_name}"]
+                        for d, t in data:
+                            d2 = d + 20
+                            line = f"{d:<15} {d2:<15} \"{t}\""
+                            lines.append(line)
+                        mud_prn = "\n".join(lines) + "\n"
+            except Exception as e:
+                st.warning(f"Could not process Mud sheet: {e}")
+        
+        # ─── Previews & Downloads ────────────────────────────────────────────────
+        if drilling_prn or mud_prn:
+            st.markdown("---")
+            
+            if drilling_prn:
+                st.subheader("Drilling Parameters PRN Preview (scroll to see full content - copy-paste ready)")
+                st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
+                
+                with st.container():
+                    st.markdown(
+                        f"""
+                        <div style="
+                            height: 400px;
+                            overflow-y: auto;
+                            overflow-x: auto;
+                            background-color: #1e1e1e;
+                            color: #d4d4d4;
+                            font-family: 'Courier New', Courier, monospace;
+                            font-size: 14px;
+                            padding: 16px;
+                            border-radius: 6px;
+                            border: 1px solid #444;
+                            white-space: pre;
+                            line-height: 1.4;
+                        ">
+                        {drilling_prn.replace("\n", "<br>").replace(" ", "&nbsp;")}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                
+                st.download_button(
+                    label="Download Drilling Parameters .prn",
+                    data=drilling_prn,
+                    file_name=f"{well_name} Drilling Parameters.prn",
+                    mime="text/plain",
+                    key="drlg_dl"
+                )
+            
+            if mud_prn:
+                st.subheader("Mud Parameters PRN Preview (scroll to see full content - copy-paste ready)")
+                st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
+                
+                with st.container():
+                    st.markdown(
+                        f"""
+                        <div style="
+                            height: 400px;
+                            overflow-y: auto;
+                            overflow-x: auto;
+                            background-color: #1e1e1e;
+                            color: #d4d4d4;
+                            font-family: 'Courier New', Courier, monospace;
+                            font-size: 14px;
+                            padding: 16px;
+                            border-radius: 6px;
+                            border: 1px solid #444;
+                            white-space: pre;
+                            line-height: 1.4;
+                        ">
+                        {mud_prn.replace("\n", "<br>").replace(" ", "&nbsp;")}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                
+                st.download_button(
+                    label="Download Mud Parameters .prn",
+                    data=mud_prn,
+                    file_name=f"{well_name} Mud Parameters.prn",
+                    mime="text/plain",
+                    key="mud_dl"
+                )
+            
+            if drilling_prn and mud_prn:
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                    zf.writestr(f"{well_name} Drilling Parameters.prn", drilling_prn)
+                    zf.writestr(f"{well_name} Mud Parameters.prn", mud_prn)
+                zip_buffer.seek(0)
+                
+                st.download_button(
+                    label="Download ZIP (Mud & Drilling Parameters)",
+                    data=zip_buffer,
+                    file_name=f"{well_name} Mud & Drilling Parameters.zip",
+                    mime="application/zip",
+                    key="mud_drlg_zip"
+                )
+
+
+
+
+
+
+
 
 # ────────────────────────────────────────────────
 # 5. Mud Log DESC Comment (with sub-header for lithology types)
