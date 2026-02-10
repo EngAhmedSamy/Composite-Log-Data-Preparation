@@ -734,7 +734,7 @@ with tab_mud_drlg_params:
                 mud_sheet = s
         
         # ─── Helper function to build quoted string ────────────────────────────
-        def build_quoted_text(parts, space_count=8):
+        def build_quoted_text(parts, space_count=1):
             formatted = []
             i = 0
             while i < len(parts):
