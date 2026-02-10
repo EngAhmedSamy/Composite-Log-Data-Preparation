@@ -734,30 +734,26 @@ with tab_mud_drlg_params:
                 mud_sheet = s
         
         # ─── Helper function to build quoted string ────────────────────────────
-        def build_quoted_text(text_parts):
-            """
-            Takes list of text fragments and formats them like:
-            "MWT: 8.6 VIS: 130 Cl: 0.5 K"
-            """
+        def build_quoted_text(parts, space_count=13):
             formatted = []
             i = 0
-            while i < len(text_parts):
-                part = text_parts[i].strip()
-                if part.endswith(':') or part in ['MWT', 'VIS', 'CL', 'K', 'WOB', 'RPM', 'SPP', 'GPM']:
-                    # Label → add space after it
-                    formatted.append(part + ' ')
+            while i < len(parts):
+                part = str(parts[i]).strip()
+                if part.endswith(':'):
+                    label = part
                     i += 1
-                    # Next is value
-                    if i < len(text_parts):
-                        val = text_parts[i].strip()
-                        formatted.append(val + ' ')
+                    if i < len(parts):
+                        val = str(parts[i])  # NO strip to preserve spaces in value
+                        formatted.append(label + val)
                         i += 1
+                    else:
+                        formatted.append(label)
                 else:
-                    # Just a value or other text
-                    formatted.append(part + ' ')
+                    formatted.append(str(parts[i]))  # no strip
                     i += 1
-            # Join everything, trim trailing space
-            return '"' + ''.join(formatted).strip() + '"'
+            # Join formatted pairs with specified number of spaces
+            spaces = ' ' * space_count
+            return '"' + spaces.join(formatted).strip() + '"'
 
         # ─── Process Drilling Parameters ────────────────────────────────────────
         if drilling_sheet:
@@ -771,18 +767,14 @@ with tab_mud_drlg_params:
                     text_parts = []
                     for val in row:
                         val_str = str(val).strip()
-                        if val_str and val_str.replace('.', '', 1).replace('-', '', 1).isdigit():
-                            if depth_v is None:
-                                depth_v = val_str
-                            else:
-                                text_parts.append(val_str)
-                        elif val_str:
-                            text_parts.append(val_str)
-                    
+                        if val_str and val_str.replace('.', '', 1).replace('-', '', 1).isdigit() and depth_v is None:
+                            depth_v = val_str
+                        elif val:
+                            text_parts.append(str(val))  # no strip to preserve any spaces
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts)
+                            quoted_text = build_quoted_text(text_parts, space_count=10)  # 10 spaces for drilling
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -807,31 +799,25 @@ with tab_mud_drlg_params:
                 for _, row in df.iterrows():
                     depth_v = None
                     text_parts = []
-                    
-                    # Scan row for first numeric (depth), then collect all remaining non-empty cells
                     for val in row:
                         val_str = str(val).strip()
                         if val_str and val_str.replace('.', '', 1).isdigit() and depth_v is None:
                             depth_v = val_str
-                        elif val_str:
-                            text_parts.append(val_str)
-                    
+                        elif val:
+                            text_parts.append(str(val))  # no strip
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            # Join all parts with single space → becomes one clean parameter string
-                            param_text = ' '.join(text_parts).strip()
-                            if param_text:
-                                data.append((d, param_text))
+                            quoted_text = build_quoted_text(text_parts, space_count=13)  # 13 spaces for mud
+                            data.append((d, quoted_text))
                         except:
                             continue
                 
                 if data:
                     lines = [f"Well: {well_name}"]
-                    for d, t in data:
+                    for d, quoted in data:
                         d2 = d + 20
-                        # Fixed-width columns + quoted text
-                        line = f"{d:<15}{d2:<15}\"{t}\""
+                        line = f"{d:<15}{d2:<15}{quoted}"
                         lines.append(line)
                     mud_prn = "\n".join(lines) + "\n"
             except Exception as e:
