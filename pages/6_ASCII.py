@@ -576,40 +576,46 @@ if uploaded_file is not None:
 
     # ─── Download buttons ────────────────────────────────────────────────────
     # ─── ASCII 1 Preview ─────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────
+# ONLY SHOW ASCII PREVIEWS & DOWNLOADS IN THE ASCII TAB
+# ───────────────────────────────────────────────────────────────
+if prn1_content or prn5_content:
+    st.markdown("---")  # optional separator
+
 if prn1_content:
     st.subheader("ASCII 1 PRN Preview (scroll to see full content- copy-paste ready)")
     st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
     # Create a scrollable container with fixed height
-    with st.container():
-        st.markdown(
-            """
-            <div style="
-                height: 400px;                /* adjust height as you prefer: 300px, 500px, etc. */
-                overflow-y: auto;             /* vertical scroll */
-                overflow-x: auto;             /* horizontal scroll if needed */
-                background-color: #1e1e1e;
-                color: #d4d4d4;
-                font-family: 'Courier New', Courier, monospace;
-                font-size: 14px;
-                padding: 16px;
-                border-radius: 6px;
-                border: 1px solid #444;
-                white-space: pre;
-                line-height: 1.4;
-            ">
-            """ + prn1_content.replace("\n", "<br>").replace(" ", "&nbsp;") + """
-            </div>
-            """,
-            unsafe_allow_html=True
+   with st.container():
+            st.markdown(
+                """
+                <div style="
+                    height: 400px;
+                    overflow-y: auto;
+                    overflow-x: auto;
+                    background-color: #1e1e1e;
+                    color: #d4d4d4;
+                    font-family: 'Courier New', Courier, monospace;
+                    font-size: 14px;
+                    padding: 16px;
+                    border-radius: 6px;
+                    border: 1px solid #444;
+                    white-space: pre;
+                    line-height: 1.4;
+                ">
+                """ + prn1_content.replace("\n", "<br>").replace(" ", "&nbsp;") + """
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        
+        st.download_button(
+            label="Download Mud Log Ascii 1.prn",
+            data=prn1_content,
+            file_name=f"{well_name} Mud Log Ascii 1.prn",
+            mime="text/plain",
+            key="ascii_download_1_unique"   # ← make key unique
         )
-
-    st.download_button(
-        label="Download Mud Log Ascii 1.prn",
-        data=prn1_content,
-        file_name=f"{well_name} Mud Log Ascii 1.prn",
-        mime="text/plain",
-        key="download_ascii1"
-    )
 
 # ─── ASCII 5 Preview ─────────────────────────────────────────────────────
 if prn5_content:
@@ -617,51 +623,51 @@ if prn5_content:
     st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
     # Same scrollable container style for ASCII 5
     with st.container():
-        st.markdown(
-            """
-            <div style="
-                height: 400px;
-                overflow-y: auto;
-                overflow-x: auto;
-                background-color: #1e1e1e;
-                color: #d4d4d4;
-                font-family: 'Courier New', Courier, monospace;
-                font-size: 14px;
-                padding: 16px;
-                border-radius: 6px;
-                border: 1px solid #444;
-                white-space: pre;
-                line-height: 1.4;
-            ">
-            """ + prn5_content.replace("\n", "<br>").replace(" ", "&nbsp;") + """
-            </div>
-            """,
-            unsafe_allow_html=True
+            st.markdown(
+                """
+                <div style="
+                    height: 400px;
+                    overflow-y: auto;
+                    overflow-x: auto;
+                    background-color: #1e1e1e;
+                    color: #d4d4d4;
+                    font-family: 'Courier New', Courier, monospace;
+                    font-size: 14px;
+                    padding: 16px;
+                    border-radius: 6px;
+                    border: 1px solid #444;
+                    white-space: pre;
+                    line-height: 1.4;
+                ">
+                """ + prn5_content.replace("\n", "<br>").replace(" ", "&nbsp;") + """
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        
+        st.download_button(
+            label="Download Mud Log Ascii 5.prn",
+            data=prn5_content,
+            file_name=f"{well_name} Mud Log Ascii 5.prn",
+            mime="text/plain",
+            key="ascii_download_5_unique"   # ← make key unique
         )
-
-    st.download_button(
-        label="Download Mud Log Ascii 5.prn",
-        data=prn5_content,
-        file_name=f"{well_name} Mud Log Ascii 5.prn",
-        mime="text/plain",
-        key="download_ascii5"
-    )
 
 # ─── Combined ZIP Download ───────────────────────────────────────────────
 if prn1_content and prn5_content:
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
-        zf.writestr(f"{well_name} Mud Log Ascii 5.prn", prn5_content)
-    zip_buffer.seek(0)
-    
-    st.download_button(
-        label="Download ZIP (Ascii 1 & 5)",
-        data=zip_buffer,
-        file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
-        mime="application/zip",
-        key="download_zip_both"
-    )
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
+            zf.writestr(f"{well_name} Mud Log Ascii 5.prn", prn5_content)
+        zip_buffer.seek(0)
+        
+        st.download_button(
+            label="Download ZIP (Ascii 1 & 5)",
+            data=zip_buffer,
+            file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
+            mime="application/zip",
+            key="ascii_zip_download_unique"   # ← unique key
+        )
 
 
 
