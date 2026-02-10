@@ -734,7 +734,7 @@ with tab_mud_drlg_params:
                 mud_sheet = s
         
         # ─── Helper function to build quoted string ────────────────────────────
-        def build_quoted_text(parts, space_count=10):
+        def build_quoted_text(parts, space_count=8):
             formatted = []
             i = 0
             while i < len(parts):
@@ -774,7 +774,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, space_count=10)  # 10 spaces for drilling
+                            quoted_text = build_quoted_text(text_parts, space_count=8)  # 10 spaces for drilling
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -783,7 +783,7 @@ with tab_mud_drlg_params:
                     lines = [f"Well: {well_name}"]
                     for d, quoted in data:
                         d2 = d + 20
-                        line = f"{d:<15}{d2:<15}{quoted}"
+                        line = f"{d:<10}{d2:<10}{quoted}"
                         lines.append(line)
                     drilling_prn = "\n".join(lines) + "\n"
             except Exception as e:
@@ -808,7 +808,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, space_count=13)  # 13 spaces for mud
+                            quoted_text = build_quoted_text(text_parts, space_count=8)  # 13 spaces for mud
                             data.append((d, quoted_text))
                         except:
                             continue
