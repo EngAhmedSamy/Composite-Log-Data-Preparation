@@ -734,7 +734,7 @@ with tab_mud_drlg_params:
                 mud_sheet = s
         
         # ─── Helper function to build quoted string ────────────────────────────
-        def build_quoted_text(parts, field_width=10):
+        def build_quoted_text(parts, field_width=20):
             """
             Builds a quoted string where each parameter is left-aligned with fixed width.
             Example output: "WOB: 1-5        RPM: 50+M     SPP: 630-820   GPM: 370      "
@@ -789,7 +789,7 @@ with tab_mud_drlg_params:
                             d = int(float(depth_v))
                             param_text = ' '.join(text_parts)
                             param_text = param_text.replace(':', ': ')
-                            quoted_text = build_quoted_text(text_parts, field_width=10)   # ← 20 characters per parameter
+                            quoted_text = build_quoted_text(text_parts, field_width=20)   # ← 20 characters per parameter
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -834,7 +834,7 @@ with tab_mud_drlg_params:
                             param_text = ' '.join(text_parts)
                             # Optional: add extra space around colons if needed
                             param_text = param_text.replace(':', ': ')
-                            quoted_text = build_quoted_text(text_parts, field_width=10)   # ← same width
+                            quoted_text = build_quoted_text(text_parts, field_width=20)   # ← same width
                             data.append((d, quoted_text))
                         except:
                             continue
