@@ -4,6 +4,7 @@ import io
 import re
 import zipfile
 import openpyxl  # for merged cells and better cell access
+import math
 
 st.title("6 - ASCII")
 
@@ -381,11 +382,7 @@ with tab_fm_tops:
 # ────────────────────────────────────────────────
 # 3. Mud Log (ASCII-1, ASCII-5)
 # ────────────────────────────────────────────────
-import streamlit as st
-import pandas as pd
-import io
-import zipfile
-import math
+
 
 st.title("Mud Log ASCII-1 and ASCII-5 Generator")
 
