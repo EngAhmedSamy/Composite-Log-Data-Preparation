@@ -506,8 +506,8 @@ if uploaded_file is not None:
                         except (ValueError, TypeError):
                             continue
 
-               # if data:
-                   # prn1_content = f" Well:  {well_name}\n   MD     WOB     RPM\n" + "\n".join(f"   {int(d)}      {int(w)}       {int(r)}" for d, w, r in data) + "\n"
+                if data:
+                    prn1_content = f" Well:  {well_name}\n   MD     WOB     RPM\n" + "\n".join(f"   {int(d)}      {int(w)}       {int(r)}" for d, w, r in data) + "\n"
                   #  st.subheader("ASCII 1 Preview (first 20 lines)")
                    # preview_lines = prn1_content.split("\n")[:20]
                   #  st.text("\n".join(preview_lines))
@@ -568,8 +568,8 @@ if uploaded_file is not None:
                         except (ValueError, TypeError):
                             continue
 
-               # if data:
-                #    prn5_content = f" Well:           {well_name}\n   MD     ROP      TG      C1      C2      C3     C4I     C4N      C5\n" + "\n".join(f"   {int(v[0])}    {v[1]:.1f}     {int(v[2])}       {int(v[3])}       {int(v[4])}       {int(v[5])}       {int(v[6])}       {int(v[7])}       {int(v[8])}" for v in data) + "\n"
+                if data:
+                    prn5_content = f" Well:           {well_name}\n   MD     ROP      TG      C1      C2      C3     C4I     C4N      C5\n" + "\n".join(f"   {int(v[0])}    {v[1]:.1f}     {int(v[2])}       {int(v[3])}       {int(v[4])}       {int(v[5])}       {int(v[6])}       {int(v[7])}       {int(v[8])}" for v in data) + "\n"
                  #   st.subheader("ASCII 5 Preview (first 20 lines)")
                   #  preview_lines = prn5_content.split("\n")[:20]
                   #  st.text("\n".join(preview_lines))
