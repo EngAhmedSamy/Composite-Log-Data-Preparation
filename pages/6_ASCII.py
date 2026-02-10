@@ -750,18 +750,21 @@ with tab_mud_drlg_params:
                 mud_sheet = s
         
         # ─── Helper function: format parameters in fixed-width columns ──────────
-        def build_quoted_text(parts, field_width=24):
+        def build_quoted_text(parts, label_width=8, value_width=12):
             """
-            Builds a quoted string where EVERY parameter starts at the same column position.
-            Each parameter (label + value) is padded to exactly 'field_width' characters.
-            Values are right-aligned within their field for nice decimal alignment.
+            Builds a quoted string with fixed-width fields for each parameter.
+            - label_width: width for label (WOB:, MWT:, etc.)
+            - value_width: width for the value (right-aligned)
+            
+            Example output:
+            "WOB:     1-10     RPM:     60-70     SPP:   630-820    GPM:      370      "
             """
             formatted = []
             i = 0
             while i < len(parts):
                 part = str(parts[i]).strip()
                 
-                # Detect label (ends with : or known keyword)
+                # Label detected
                 if part.endswith(':') or part.upper() in ['WOB', 'RPM', 'SPP', 'GPM', 'MWT', 'VIS', 'CL', 'K']:
                     label = part
                     i += 1
@@ -770,18 +773,20 @@ with tab_mud_drlg_params:
                         value = str(parts[i]).strip()
                         i += 1
                     
-                    # Format: label + value, value right-aligned in remaining space
-                    combined = f"{label} {value}"
-                    # Pad to fixed width (left-align whole thing)
-                    formatted.append(combined.ljust(field_width))
+                    # Format label left-aligned, value right-aligned
+                    label_part = f"{label:<{label_width}}"
+                    value_part = f"{value:>{value_width}}"
+                    combined = label_part + value_part
+                    formatted.append(combined)
                 
                 else:
-                    # Standalone value or text → pad to width
-                    formatted.append(part.ljust(field_width))
+                    # Standalone value or text
+                    formatted.append(f"{part:>{value_width}}")
                     i += 1
             
-            # Join all fixed-width fields → no extra spaces needed
-            return '"' + ''.join(formatted).rstrip() + '"'
+            # Join with NO extra spaces (padding is already inside each field)
+            return '"' + ''.join(formatted) + '"'
+        
         
         # ─── Process Drilling Parameters ────────────────────────────────────────
         if drilling_sheet:
@@ -805,7 +810,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, field_width=24)  # ← key line
+                            quoted_text = build_quoted_text(text_parts, label_width=8, value_width=12)  # ← key line
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -814,7 +819,7 @@ with tab_mud_drlg_params:
                     lines = [f"Well: {well_name}"]
                     for d, quoted in data:
                         d2 = d + 20
-                        line = f"{d:<22}{d2:<22}{quoted}"
+                        line = f"{d:<15}{d2:<15}{quoted}"
                         lines.append(line)
                     drilling_prn = "\n".join(lines) + "\n"
                 else:
@@ -844,7 +849,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, field_width=24)  # ← same width
+                            quoted_text = build_quoted_text(text_parts, label_width=8, value_width=12)  # ← same width
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -853,7 +858,7 @@ with tab_mud_drlg_params:
                     lines = [f"Well: {well_name}"]
                     for d, quoted in data:
                         d2 = d + 20
-                        line = f"{d:<22}{d2:<22}{quoted}"
+                        line = f"{d:<15}{d2:<15}{quoted}"
                         lines.append(line)
                     mud_prn = "\n".join(lines) + "\n"
                 else:
