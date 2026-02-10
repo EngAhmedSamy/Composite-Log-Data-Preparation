@@ -34,7 +34,7 @@ if st.sidebar.button("Apply Well Name", type="primary"):
 # ─── Sidebar Copyright / Watermark Footer (visible on ALL pages) ──────────
 
 st.sidebar.markdown("---")  # separator line above the copyright
-
+st.sidebar.markdown("---")
 st.sidebar.markdown(
     """
     <div style="
