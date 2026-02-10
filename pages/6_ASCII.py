@@ -501,7 +501,19 @@ with tab_mud_log_ascii:
                             except:
                                 continue
                     if data:
-                        prn1_content = f" Well: {well_name}\n MD WOB RPM\n" + "\n".join(f" {int(d)} {int(w)} {int(r)}" for d, w, r in data) + "\n"
+                        #prn1_content = f" Well: {well_name}\n MD WOB RPM\n" + "\n".join(f" {int(d)} {int(w)} {int(r)}" for d, w, r in data) + "\n"
+                        # ── Better aligned format ────────────────────────────────────────
+                        lines = []
+                        lines.append(f"Well: {well_name}")
+                        lines.append("")  # empty line after well name
+                        lines.append("   MD     WOB     RPM")
+                
+                        for d, w, r in data:
+                            # Right-align MD (width 6), WOB (width 6), RPM (width 6)
+                            line = f"{int(d):6d} {int(w):6d} {int(r):6d}"
+                            lines.append(line)
+                
+                        prn1_content = "\n".join(lines) + "\n"
         
         # ─── Process ASCII 5 (MD, ROP, TG, C1–C5) ───────────────────────────────
         if df_gas5 is not None:
