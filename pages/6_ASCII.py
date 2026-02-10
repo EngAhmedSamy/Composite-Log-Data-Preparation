@@ -24,7 +24,7 @@ tab_gyro, tab_fm_tops, tab_mud_log_ascii, tab_mud_drlg_params, tab_desc_comment,
 with tab_gyro:
     st.header("Gyro Data")
 
-    excel_file = st.file_uploader("Upload Gyro / Survey Excel File", type=["xlsx", "xls"])
+    excel_file = st.file_uploader("Upload Gyro / Survey Excel File", type=["xlsx", "xls"], key="uploader_gyro_survey")
 
     if excel_file is not None:
         try:
@@ -237,7 +237,7 @@ with tab_fm_tops:
         st.session_state.matched_tops = []
 
     # Upload Excel option
-    excel_file = st.file_uploader("Upload Fm Tops Excel (optional)", type=["xlsx", "xls"])
+    excel_file = st.file_uploader("Upload Fm Tops Excel (optional)", type=["xlsx", "xls"], key="fm_tops_uploader")
 
     # Auto-fill logic - only run once per file
     if excel_file:
@@ -386,7 +386,7 @@ with tab_fm_tops:
 
 with tab_mud_log_ascii:
     st.title("Mud Log ASCII-1 and ASCII-5 Generator")
-    uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"])
+    uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"], key="uploader_ascii_drlg_gas")
     
     prn1_content = None
     prn5_content = None
@@ -689,7 +689,7 @@ with tab_mud_log_ascii:
 with tab_mud_drlg_params:
     st.header("Mud & Drilling Parameters")
     
-    uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"])
+    uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"], key="uploader_mud_drlg_params")
     
     if uploaded_file is not None:
         file_bytes = uploaded_file.read()
