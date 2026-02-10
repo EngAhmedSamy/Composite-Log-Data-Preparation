@@ -750,7 +750,7 @@ with tab_mud_drlg_params:
                 mud_sheet = s
         
         # ─── Helper function: format parameters in fixed-width columns ──────────
-        def build_quoted_text(parts, label_width=8, value_width=12):
+        def build_quoted_text(parts, label_width=10, value_width=12):
             """
             Builds a quoted string with fixed-width fields for each parameter.
             - label_width: width for label (WOB:, MWT:, etc.)
