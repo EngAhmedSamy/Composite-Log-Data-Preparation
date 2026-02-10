@@ -785,7 +785,7 @@ with tab_mud_drlg_params:
                         d2 = d + 20
                         line = f"{d:<10}{d2:<10}{quoted}"
                         lines.append(line)
-                    drilling_prn = "\n".join(lines) 
+                    drilling_prn = "\n".join(lines) + "\n"
             except Exception as e:
                 st.warning(f"Drilling sheet error: {e}")
         
@@ -808,7 +808,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, space_count=8)  # 13 spaces for mud
+                            quoted_text = '"' + ' '.join([str(p).strip() for p in text_parts]).strip() + '"'  # 13 spaces for mud
                             data.append((d, quoted_text))
                         except:
                             continue
