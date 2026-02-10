@@ -808,7 +808,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, space_count=13)  # 13 spaces for mud
+                            quoted_text = build_quoted_text(text_parts, space_count=5)  # 13 spaces for mud
                             data.append((d, quoted_text))
                         except:
                             continue
