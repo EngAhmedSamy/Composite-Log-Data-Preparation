@@ -807,29 +807,31 @@ with tab_mud_drlg_params:
                 for _, row in df.iterrows():
                     depth_v = None
                     text_parts = []
+                    
+                    # Scan row for first numeric (depth), then collect all remaining non-empty cells
                     for val in row:
                         val_str = str(val).strip()
-                        if val_str and val_str.replace('.', '', 1).isdigit():
-                            if depth_v is None:
-                                depth_v = val_str
-                            else:
-                                text_parts.append(val_str)
+                        if val_str and val_str.replace('.', '', 1).isdigit() and depth_v is None:
+                            depth_v = val_str
                         elif val_str:
                             text_parts.append(val_str)
                     
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts)
-                            data.append((d, quoted_text))
+                            # Join all parts with single space → becomes one clean parameter string
+                            param_text = ' '.join(text_parts).strip()
+                            if param_text:
+                                data.append((d, param_text))
                         except:
                             continue
                 
                 if data:
                     lines = [f"Well: {well_name}"]
-                    for d, quoted in data:
+                    for d, t in data:
                         d2 = d + 20
-                        line = f"{d:<15}{d2:<15}{quoted}"
+                        # Fixed-width columns + quoted text
+                        line = f"{d:<15}{d2:<15}\"{t}\""
                         lines.append(line)
                     mud_prn = "\n".join(lines) + "\n"
             except Exception as e:
