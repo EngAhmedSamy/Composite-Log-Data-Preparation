@@ -386,19 +386,18 @@ with tab_fm_tops:
 
 with tab_mud_log_ascii:
     st.title("Mud Log ASCII-1 and ASCII-5 Generator")
-
     uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"])
-
+    
     prn1_content = None
     prn5_content = None
     well_name = "Unknown_Well"
     df_drlg1 = None
     df_gas5 = None
-
+    
     if uploaded_file is not None:
         file_bytes = uploaded_file.read()
         uploaded_file.seek(0)
-
+        
         # ─── Try modern .xlsx first ──────────────────────────────────────────────
         try:
             wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="openpyxl")
@@ -413,7 +412,7 @@ with tab_mud_log_ascii:
                 st.error("Cannot read the file with openpyxl or xlrd.")
                 st.error("Please open in Excel → Save As → .xlsx format and try again.")
                 st.stop()
-
+        
         # Find well name (simple search in all sheets)
         for sheet_name in sheet_names:
             try:
@@ -432,23 +431,35 @@ with tab_mud_log_ascii:
                 continue
             if well_name != "Unknown_Well":
                 break
-
+        
         # ─── Load DRLG 1 ─────────────────────────────────────────────────────────
         if "DRLG 1" in sheet_names:
             try:
-                df_drlg1 = pd.read_excel(wb, sheet_name="DRLG 1", header=None, dtype=str, keep_default_na=False)
+                df_drlg1 = pd.read_excel(
+                    wb,
+                    sheet_name="DRLG 1",
+                    header=None,
+                    dtype=str,
+                    keep_default_na=False
+                )
                 st.success("DRLG 1 sheet loaded")
             except Exception as e:
                 st.warning(f"Could not read DRLG 1: {e}")
-
+        
         # ─── Load GAS 5 ──────────────────────────────────────────────────────────
         if "GAS 5" in sheet_names:
             try:
-                df_gas5 = pd.read_excel(wb, sheet_name="GAS 5", header=None, dtype=str, keep_default_na=False)
+                df_gas5 = pd.read_excel(
+                    wb,
+                    sheet_name="GAS 5",
+                    header=None,
+                    dtype=str,
+                    keep_default_na=False
+                )
                 st.success("GAS 5 sheet loaded")
             except Exception as e:
                 st.warning(f"Could not read GAS 5: {e}")
-
+        
         # ─── Process ASCII 1 (MD, WOB, RPM) ──────────────────────────────────────
         if df_drlg1 is not None:
             # Look for header row containing T_Dpth / Depth, WOB, RPM
@@ -490,8 +501,8 @@ with tab_mud_log_ascii:
                             except:
                                 continue
                     if data:
-                        prn1_content = f" Well: {well_name}\n   MD     WOB     RPM\n" + "\n".join(f"   {int(d)}      {int(w)}       {int(r)}" for d, w, r in data) + "\n"
-
+                        prn1_content = f" Well: {well_name}\n MD WOB RPM\n" + "\n".join(f" {int(d)} {int(w)} {int(r)}" for d, w, r in data) + "\n"
+        
         # ─── Process ASCII 5 (MD, ROP, TG, C1–C5) ───────────────────────────────
         if df_gas5 is not None:
             header_row_idx = None
@@ -506,8 +517,8 @@ with tab_mud_log_ascii:
                 df_data = df_gas5.iloc[data_start:].copy()
                 cols = df_gas5.iloc[header_row_idx].astype(str).str.upper().str.strip()
                 depth_col = next((j for j, v in enumerate(cols) if "T_DPTH" in v or "DEPTH" in v or "MD" in v), None)
-                rop_col   = next((j for j, v in enumerate(cols) if "ROP" in v), None)
-                tg_col    = next((j for j, v in enumerate(cols) if "TG" in v or "T_GAS" in v), None)
+                rop_col = next((j for j, v in enumerate(cols) if "ROP" in v), None)
+                tg_col = next((j for j, v in enumerate(cols) if "TG" in v or "T_GAS" in v), None)
                 gas_cols = []
                 for name in ["C1", "C2", "C3", "IC4", "NC4", "C5", "C4I", "C4N"]:
                     idx = next((j for j, v in enumerate(cols) if name in v), None)
@@ -531,16 +542,17 @@ with tab_mud_log_ascii:
                                 if math.isnan(tg): tg = 0.0
                                 values.append(tg)
                                 for _, idx in gas_cols[:6]:  # take first 6
-                                  v = row.iloc[idx]
-                                  vv = float(v) if pd.notna(v) and v != '' else 0.0
-                                  if math.isnan(vv): vv = 0.0
-                                  values.append(vv)
-                                 data.append(values)
-                               except (ValueError, TypeError):
-                                 continue
-                        if data:
-                           prn5_content = f" Well:           {well_name}\n   MD     ROP      TG      C1      C2      C3     C4I     C4N      C5\n" + "\n".join(f"   {int(v[0])}    {v[1]:.1f}     {int(v[2])}       {int(v[3])}       {int(v[4])}       {int(v[5])}       {int(v[6])}       {int(v[7])}       {int(v[8])}" for v in data) + "\n"
+                                    v = row.iloc[idx]
+                                    vv = float(v) if pd.notna(v) and v != '' else 0.0
+                                    if math.isnan(vv): vv = 0.0
+                                    values.append(vv)
+                                data.append(values)
+                            except (ValueError, TypeError):
+                                continue
+                    if data:
+                        prn5_content = f" Well: {well_name}\n MD ROP TG C1 C2 C3 C4I C4N C5\n" + "\n".join(f" {int(v[0])} {v[1]:.1f} {int(v[2])} {int(v[3])} {int(v[4])} {int(v[5])} {int(v[6])} {int(v[7])} {int(v[8])}" for v in data) + "\n"
 
+    
     # ─── Previews & Downloads ────────────────────────────────────────────────
     # This block is now safely inside the tab
     if prn1_content or prn5_content:
