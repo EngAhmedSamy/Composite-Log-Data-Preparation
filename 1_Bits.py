@@ -338,3 +338,16 @@ else:
 
 
 
+
+# Add footer at end of each tab if needed
+st.markdown("---")
+st.markdown(
+    """
+    <div style="text-align: center; color: #888; font-size: 0.9rem; padding: 12px 0;">
+        © 2026 Ahmed Samy / Composite Log Data Preparation App – Proprietary Software<br>
+        All Rights Reserved – Private Property – For internal use only
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
