@@ -29,3 +29,6 @@ st.set_page_config(page_title="Petrel Composite Log Prep", layout="wide", page_i
                    
 st.title("Petrel Composite Log Data Preparation App")
 st.markdown("### Tab 10: Help (How to use the app ?!)")
+
+
+st.info("Detailed Manual for using the app is coming up soon!")
