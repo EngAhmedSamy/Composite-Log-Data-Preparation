@@ -384,295 +384,246 @@ with tab_fm_tops:
 # ────────────────────────────────────────────────
 
 
-st.title("Mud Log ASCII-1 and ASCII-5 Generator")
+with tab_mud_log_ascii:
+    st.title("Mud Log ASCII-1 and ASCII-5 Generator")
 
-uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"])
+    uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"])
 
-if uploaded_file is not None:
-    file_bytes = uploaded_file.read()
-    uploaded_file.seek(0)
-
+    prn1_content = None
+    prn5_content = None
     well_name = "Unknown_Well"
     df_drlg1 = None
-    df_gas5  = None
+    df_gas5 = None
 
-    # ─── Try modern .xlsx first ──────────────────────────────────────────────
-    try:
-        wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="openpyxl")
-        sheet_names = wb.sheet_names
-        st.success("Loaded as modern .xlsx")
-    except Exception:
+    if uploaded_file is not None:
+        file_bytes = uploaded_file.read()
+        uploaded_file.seek(0)
+
+        # ─── Try modern .xlsx first ──────────────────────────────────────────────
         try:
-            wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="xlrd")
+            wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="openpyxl")
             sheet_names = wb.sheet_names
-            st.warning("Loaded as legacy .xls (Excel 97-2003 format)")
-        except Exception as e:
-            st.error("Cannot read the file with openpyxl or xlrd.")
-            st.error("Please open in Excel → Save As → .xlsx format and try again.")
-            st.stop()
+            st.success("Loaded as modern .xlsx")
+        except Exception:
+            try:
+                wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="xlrd")
+                sheet_names = wb.sheet_names
+                st.warning("Loaded as legacy .xls (Excel 97-2003 format)")
+            except Exception as e:
+                st.error("Cannot read the file with openpyxl or xlrd.")
+                st.error("Please open in Excel → Save As → .xlsx format and try again.")
+                st.stop()
 
-    # Find well name (simple search in all sheets)
-    for sheet_name in sheet_names:
-        try:
-            df_temp = pd.read_excel(wb, sheet_name=sheet_name, header=None, dtype=str)
-            for _, row in df_temp.iterrows():
-                for val in row:
-                    if pd.notna(val) and isinstance(val, str) and "WELL:" in val.upper():
-                        parts = val.upper().split("WELL:")
-                        if len(parts) > 1:
-                            well_name = parts[1].strip().replace("\n", " ").strip()
-                            st.info(f"Well name detected: **{well_name}**")
-                            break
-                if well_name != "Unknown_Well":
-                    break
-        except:
-            continue
-        if well_name != "Unknown_Well":
-            break
+        # Find well name (simple search in all sheets)
+        for sheet_name in sheet_names:
+            try:
+                df_temp = pd.read_excel(wb, sheet_name=sheet_name, header=None, dtype=str)
+                for _, row in df_temp.iterrows():
+                    for val in row:
+                        if pd.notna(val) and isinstance(val, str) and "WELL:" in val.upper():
+                            parts = val.upper().split("WELL:")
+                            if len(parts) > 1:
+                                well_name = parts[1].strip().replace("\n", " ").strip()
+                                st.info(f"Well name detected: **{well_name}**")
+                                break
+                    if well_name != "Unknown_Well":
+                        break
+            except:
+                continue
+            if well_name != "Unknown_Well":
+                break
 
-    # ─── Load DRLG 1 ─────────────────────────────────────────────────────────
-    if "DRLG 1" in sheet_names:
-        try:
-            df_drlg1 = pd.read_excel(
-                wb,
-                sheet_name="DRLG 1",
-                header=None,
-                dtype=str,
-                keep_default_na=False
+        # ─── Load DRLG 1 ─────────────────────────────────────────────────────────
+        if "DRLG 1" in sheet_names:
+            try:
+                df_drlg1 = pd.read_excel(wb, sheet_name="DRLG 1", header=None, dtype=str, keep_default_na=False)
+                st.success("DRLG 1 sheet loaded")
+            except Exception as e:
+                st.warning(f"Could not read DRLG 1: {e}")
+
+        # ─── Load GAS 5 ──────────────────────────────────────────────────────────
+        if "GAS 5" in sheet_names:
+            try:
+                df_gas5 = pd.read_excel(wb, sheet_name="GAS 5", header=None, dtype=str, keep_default_na=False)
+                st.success("GAS 5 sheet loaded")
+            except Exception as e:
+                st.warning(f"Could not read GAS 5: {e}")
+
+        # ─── Process ASCII 1 (MD, WOB, RPM) ──────────────────────────────────────
+        if df_drlg1 is not None:
+            # Look for header row containing T_Dpth / Depth, WOB, RPM
+            header_row_idx = None
+            for i, row in df_drlg1.iterrows():
+                row_str = row.astype(str).str.upper().str.strip()
+                if any("T_DPTH" in x or "DEPTH" in x or "MD" in x for x in row_str):
+                    if any("WOB" in x for x in row_str) and any("RPM" in x for x in row_str):
+                        header_row_idx = i
+                        break
+            if header_row_idx is not None:
+                # Assume data starts 2 rows below header (after units)
+                data_start = header_row_idx + 2
+                df_data = df_drlg1.iloc[data_start:].copy()
+                # Find column indices
+                cols = df_drlg1.iloc[header_row_idx].astype(str).str.upper().str.strip()
+                depth_col = wob_col = rpm_col = None
+                for j, val in enumerate(cols):
+                    if "T_DPTH" in val or "DEPTH" in val or "MD" in val:
+                        depth_col = j
+                    if "WOB" in val:
+                        wob_col = j
+                    if "RPM" in val:
+                        rpm_col = j
+                if depth_col is not None and wob_col is not None and rpm_col is not None:
+                    data = []
+                    for _, row in df_data.iterrows():
+                        md_v = row.iloc[depth_col]
+                        w_v = row.iloc[wob_col]
+                        r_v = row.iloc[rpm_col]
+                        if pd.notna(md_v) and md_v != '':
+                            try:
+                                d = float(md_v)
+                                w = float(w_v) if pd.notna(w_v) and w_v != '' else 0.0
+                                if math.isnan(w): w = 0.0
+                                r = float(r_v) if pd.notna(r_v) and r_v != '' else 0.0
+                                if math.isnan(r): r = 0.0
+                                data.append((d, w, r))
+                            except:
+                                continue
+                    if data:
+                        prn1_content = f" Well: {well_name}\n   MD     WOB     RPM\n" + "\n".join(f"   {int(d)}      {int(w)}       {int(r)}" for d, w, r in data) + "\n"
+
+        # ─── Process ASCII 5 (MD, ROP, TG, C1–C5) ───────────────────────────────
+        if df_gas5 is not None:
+            header_row_idx = None
+            for i, row in df_gas5.iterrows():
+                row_str = row.astype(str).str.upper().str.strip()
+                if any("T_DPTH" in x or "DEPTH" in x or "MD" in x for x in row_str):
+                    if any("ROP" in x for x in row_str) and any("C1" in x for x in row_str):
+                        header_row_idx = i
+                        break
+            if header_row_idx is not None:
+                data_start = header_row_idx + 2
+                df_data = df_gas5.iloc[data_start:].copy()
+                cols = df_gas5.iloc[header_row_idx].astype(str).str.upper().str.strip()
+                depth_col = next((j for j, v in enumerate(cols) if "T_DPTH" in v or "DEPTH" in v or "MD" in v), None)
+                rop_col   = next((j for j, v in enumerate(cols) if "ROP" in v), None)
+                tg_col    = next((j for j, v in enumerate(cols) if "TG" in v or "T_GAS" in v), None)
+                gas_cols = []
+                for name in ["C1", "C2", "C3", "IC4", "NC4", "C5", "C4I", "C4N"]:
+                    idx = next((j for j, v in enumerate(cols) if name in v), None)
+                    if idx is not None:
+                        gas_cols.append((name, idx))
+                # Assume order C1 C2 C3 C4I C4N C5
+                if depth_col and rop_col and tg_col and len(gas_cols) >= 6:
+                    data = []
+                    for _, row in df_data.iterrows():
+                        values = []
+                        md_v = row.iloc[depth_col]
+                        if pd.notna(md_v) and md_v != '':
+                            try:
+                                values.append(float(md_v))
+                                rop = float(row.iloc[rop_col]) if pd.notna(row.iloc[rop_col]) else 0.0
+                                values.append(rop)
+                                tg = float(row.iloc[tg_col]) if pd.notna(row.iloc[tg_col]) else 0.0
+                                values.append(tg)
+                                for _, idx in gas_cols[:6]:
+                                    vv = float(row.iloc[idx]) if pd.notna(row.iloc[idx]) else 0.0
+                                    values.append(vv)
+                                data.append(values)
+                            except:
+                                continue
+                    if data:
+                        prn5_content = f" Well:           {well_name}\n   MD     ROP      TG      C1      C2      C3     C4I     C4N      C5\n" + "\n".join(f"   {int(v[0])}    {v[1]:.1f}     {int(v[2])}       {int(v[3])}       {int(v[4])}       {int(v[5])}       {int(v[6])}       {int(v[7])}       {int(v[8])}" for v in data) + "\n"
+
+    # ─── Previews & Downloads ────────────────────────────────────────────────
+    # This block is now safely inside the tab
+    if prn1_content or prn5_content:
+        st.markdown("---")
+
+        # ─── ASCII 1 Preview ─────────────────────────────────────────────────────
+        if prn1_content:
+            st.subheader("ASCII 1 PRN Preview (scroll to see full content - copy-paste ready)")
+            st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
+        # Create a scrollable container with fixed height
+            with st.container():
+                st.markdown(
+                    f"""
+                    <div style="
+                        height: 400px;
+                        overflow-y: auto;
+                        overflow-x: auto;
+                        background-color: #1e1e1e;
+                        color: #d4d4d4;
+                        font-family: 'Courier New', Courier, monospace;
+                        font-size: 14px;
+                        padding: 16px;
+                        border-radius: 6px;
+                        border: 1px solid #444;
+                        white-space: pre;
+                        line-height: 1.4;
+                    ">
+                    {prn1_content.replace("\n", "<br>").replace(" ", "&nbsp;")}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            st.download_button(
+                label="Download Mud Log Ascii 1.prn",
+                data=prn1_content,
+                file_name=f"{well_name} Mud Log Ascii 1.prn",
+                mime="text/plain",
+                key="ascii1_dl"
             )
-            st.success("DRLG 1 sheet loaded")
-        except Exception as e:
-            st.warning(f"Could not read DRLG 1: {e}")
 
-    # ─── Load GAS 5 ──────────────────────────────────────────────────────────
-    if "GAS 5" in sheet_names:
-        try:
-            df_gas5 = pd.read_excel(
-                wb,
-                sheet_name="GAS 5",
-                header=None,
-                dtype=str,
-                keep_default_na=False
+        
+        # ─── ASCII 5 Preview ─────────────────────────────────────────────────────
+        if prn5_content:
+            st.subheader("ASCII 5 PRN Preview (scroll to see full content - copy-paste ready)")
+            st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
+            with st.container():
+                st.markdown(
+                    f"""
+                    <div style="
+                        height: 400px;
+                        overflow-y: auto;
+                        overflow-x: auto;
+                        background-color: #1e1e1e;
+                        color: #d4d4d4;
+                        font-family: 'Courier New', Courier, monospace;
+                        font-size: 14px;
+                        padding: 16px;
+                        border-radius: 6px;
+                        border: 1px solid #444;
+                        white-space: pre;
+                        line-height: 1.4;
+                    ">
+                    {prn5_content.replace("\n", "<br>").replace(" ", "&nbsp;")}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            st.download_button(
+                label="Download Mud Log Ascii 5.prn",
+                data=prn5_content,
+                file_name=f"{well_name} Mud Log Ascii 5.prn",
+                mime="text/plain",
+                key="ascii5_dl"
             )
-            st.success("GAS 5 sheet loaded")
-        except Exception as e:
-            st.warning(f"Could not read GAS 5: {e}")
 
-    # ─── Process ASCII 1 (MD, WOB, RPM) ──────────────────────────────────────
-    prn1_content = None
-    if df_drlg1 is not None:
-        # Look for header row containing T_Dpth / Depth, WOB, RPM
-        header_row_idx = None
-        for i, row in df_drlg1.iterrows():
-            row_str = row.astype(str).str.upper().str.strip()
-            if any("T_DPTH" in x or "DEPTH" in x or "MD" in x for x in row_str):
-                if any("WOB" in x for x in row_str) and any("RPM" in x for x in row_str):
-                    header_row_idx = i
-                    break
-
-        if header_row_idx is not None:
-            # Assume data starts 2 rows below header (after units)
-            data_start = header_row_idx + 2
-            df_data = df_drlg1.iloc[data_start:].copy()
-
-            # Find column indices
-            cols = df_drlg1.iloc[header_row_idx].astype(str).str.upper().str.strip()
-            depth_col = None
-            wob_col   = None
-            rpm_col   = None
-
-            for j, val in enumerate(cols):
-                if "T_DPTH" in val or "DEPTH" in val or "MD" in val:
-                    depth_col = j
-                if "WOB" in val:
-                    wob_col = j
-                if "RPM" in val:
-                    rpm_col = j
-
-            if depth_col is not None and wob_col is not None and rpm_col is not None:
-                data = []
-                for _, row in df_data.iterrows():
-                    md_v = row.iloc[depth_col]
-                    w_v = row.iloc[wob_col]
-                    r_v = row.iloc[rpm_col]
-                    if pd.notna(md_v) and md_v != '':
-                        try:
-                            d = float(md_v)
-                            w = float(w_v) if pd.notna(w_v) and w_v != '' else 0.0
-                            if math.isnan(w): w = 0.0
-                            r = float(r_v) if pd.notna(r_v) and r_v != '' else 0.0
-                            if math.isnan(r): r = 0.0
-                            data.append((d, w, r))
-                        except (ValueError, TypeError):
-                            continue
-
-                if data:
-                    prn1_content = f" Well:  {well_name}\n   MD     WOB     RPM\n" + "\n".join(f"   {int(d)}      {int(w)}       {int(r)}" for d, w, r in data) + "\n"
-                  #  st.subheader("ASCII 1 Preview (first 20 lines)")
-                   # preview_lines = prn1_content.split("\n")[:20]
-                  #  st.text("\n".join(preview_lines))
-
-
-
-    
-
-    # ─── Process ASCII 5 (MD, ROP, TG, C1–C5) ───────────────────────────────
-    prn5_content = None
-    if df_gas5 is not None:
-        header_row_idx = None
-        for i, row in df_gas5.iterrows():
-            row_str = row.astype(str).str.upper().str.strip()
-            if any("T_DPTH" in x or "DEPTH" in x or "MD" in x for x in row_str):
-                if any("ROP" in x for x in row_str) and any("C1" in x for x in row_str):
-                    header_row_idx = i
-                    break
-
-        if header_row_idx is not None:
-            data_start = header_row_idx + 2
-            df_data = df_gas5.iloc[data_start:].copy()
-
-            cols = df_gas5.iloc[header_row_idx].astype(str).str.upper().str.strip()
-            depth_col = next((j for j, v in enumerate(cols) if "T_DPTH" in v or "DEPTH" in v or "MD" in v), None)
-            rop_col   = next((j for j, v in enumerate(cols) if "ROP" in v), None)
-            tg_col    = next((j for j, v in enumerate(cols) if "TG" in v or "T_GAS" in v), None)
-
-            gas_cols = []
-            for name in ["C1", "C2", "C3", "IC4", "NC4", "C5", "C4I", "C4N"]:
-                idx = next((j for j, v in enumerate(cols) if name in v), None)
-                if idx is not None:
-                    gas_cols.append((name, idx))
-
-            # Assume order C1 C2 C3 C4I C4N C5
-            if depth_col is not None and rop_col is not None and tg_col is not None and len(gas_cols) >= 6:
-                data = []
-                for _, row in df_data.iterrows():
-                    values = []
-                    md_v = row.iloc[depth_col]
-                    if pd.notna(md_v) and md_v != '':
-                        try:
-                            values.append(float(md_v))
-                            rop_v = row.iloc[rop_col]
-                            rop = float(rop_v) if pd.notna(rop_v) and rop_v != '' else 0.0
-                            if math.isnan(rop): rop = 0.0
-                            values.append(rop)
-                            tg_v = row.iloc[tg_col]
-                            tg = float(tg_v) if pd.notna(tg_v) and tg_v != '' else 0.0
-                            if math.isnan(tg): tg = 0.0
-                            values.append(tg)
-                            for _, idx in gas_cols[:6]:  # take first 6
-                                v = row.iloc[idx]
-                                vv = float(v) if pd.notna(v) and v != '' else 0.0
-                                if math.isnan(vv): vv = 0.0
-                                values.append(vv)
-                            data.append(values)
-                        except (ValueError, TypeError):
-                            continue
-
-                if data:
-                    prn5_content = f" Well:           {well_name}\n   MD     ROP      TG      C1      C2      C3     C4I     C4N      C5\n" + "\n".join(f"   {int(v[0])}    {v[1]:.1f}     {int(v[2])}       {int(v[3])}       {int(v[4])}       {int(v[5])}       {int(v[6])}       {int(v[7])}       {int(v[8])}" for v in data) + "\n"
-                 #   st.subheader("ASCII 5 Preview (first 20 lines)")
-                  #  preview_lines = prn5_content.split("\n")[:20]
-                  #  st.text("\n".join(preview_lines))
-
-    # ─── Download buttons ────────────────────────────────────────────────────
-    # ─── ASCII 1 Preview ─────────────────────────────────────────────────────
-# ───────────────────────────────────────────────────────────────
-# ONLY SHOW ASCII PREVIEWS & DOWNLOADS IN THE ASCII TAB
-# ───────────────────────────────────────────────────────────────
-# ───────────────────────────────────────────────────────────────
-# ONLY SHOW ASCII PREVIEWS & DOWNLOADS IN THE ASCII TAB
-# ───────────────────────────────────────────────────────────────
-
-if prn1_content or prn5_content:
-    st.markdown("---")  # optional separator
-
-    # ─── ASCII 1 Preview ─────────────────────────────────────────────────────
-    if prn1_content:
-        st.subheader("ASCII 1 PRN Preview (scroll to see full content - copy-paste ready)")
-        st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
-    # Create a scrollable container with fixed height    
-        with st.container():
-            st.markdown(
-                """
-                <div style="
-                    height: 400px;
-                    overflow-y: auto;
-                    overflow-x: auto;
-                    background-color: #1e1e1e;
-                    color: #d4d4d4;
-                    font-family: 'Courier New', Courier, monospace;
-                    font-size: 14px;
-                    padding: 16px;
-                    border-radius: 6px;
-                    border: 1px solid #444;
-                    white-space: pre;
-                    line-height: 1.4;
-                ">
-                """ + prn1_content.replace("\n", "<br>").replace(" ", "&nbsp;") + """
-                </div>
-                """,
-                unsafe_allow_html=True
+        # ─── Combined ZIP Download ───────────────────────────────────────────────
+        if prn1_content and prn5_content:
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
+                zf.writestr(f"{well_name} Mud Log Ascii 5.prn", prn5_content)
+            zip_buffer.seek(0)
+            st.download_button(
+                label="Download ZIP (Ascii 1 & 5)",
+                data=zip_buffer,
+                file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
+                mime="application/zip",
+                key="ascii_zip_dl"
             )
-        
-        st.download_button(
-            label="Download Mud Log Ascii 1.prn",
-            data=prn1_content,
-            file_name=f"{well_name} Mud Log Ascii 1.prn",
-            mime="text/plain",
-            key="ascii_download_1_unique"
-        )
-
-    # ─── ASCII 5 Preview ─────────────────────────────────────────────────────
-    if prn5_content:
-        st.subheader("ASCII 5 PRN Preview (scroll to see full content - copy-paste ready)")
-        st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
-        
-        with st.container():
-            st.markdown(
-                """
-                <div style="
-                    height: 400px;
-                    overflow-y: auto;
-                    overflow-x: auto;
-                    background-color: #1e1e1e;
-                    color: #d4d4d4;
-                    font-family: 'Courier New', Courier, monospace;
-                    font-size: 14px;
-                    padding: 16px;
-                    border-radius: 6px;
-                    border: 1px solid #444;
-                    white-space: pre;
-                    line-height: 1.4;
-                ">
-                """ + prn5_content.replace("\n", "<br>").replace(" ", "&nbsp;") + """
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        
-        st.download_button(
-            label="Download Mud Log Ascii 5.prn",
-            data=prn5_content,
-            file_name=f"{well_name} Mud Log Ascii 5.prn",
-            mime="text/plain",
-            key="ascii_download_5_unique"
-        )
-
-    # ─── Combined ZIP Download ───────────────────────────────────────────────
-    if prn1_content and prn5_content:
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
-            zf.writestr(f"{well_name} Mud Log Ascii 5.prn", prn5_content)
-        zip_buffer.seek(0)
-        
-        st.download_button(
-            label="Download ZIP (Ascii 1 & 5)",
-            data=zip_buffer,
-            file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
-            mime="application/zip",
-            key="ascii_zip_download_unique"
-        )
 
 
 
