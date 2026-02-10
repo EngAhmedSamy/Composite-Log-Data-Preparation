@@ -31,7 +31,7 @@ if st.sidebar.button("Apply Well Name", type="primary"):
 # Now every tab can use st.session_state.well_name
 
 # ─── Sidebar Copyright / Watermark Footer (visible on ALL pages) ──────────
-st.sidebar.markdown("---")  # separator line above the copyright
+#st.sidebar.markdown("---")  # separator line above the copyright
 
 st.sidebar.markdown(
     """
