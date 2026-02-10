@@ -562,7 +562,28 @@ with tab_mud_log_ascii:
                             except (ValueError, TypeError):
                                 continue
                     if data:
-                        prn5_content = f" Well: {well_name}\n MD ROP TG C1 C2 C3 C4I C4N C5\n" + "\n".join(f" {int(v[0])} {v[1]:.1f} {int(v[2])} {int(v[3])} {int(v[4])} {int(v[5])} {int(v[6])} {int(v[7])} {int(v[8])}" for v in data) + "\n"
+                        # prn5_content = f" Well: {well_name}\n MD ROP TG C1 C2 C3 C4I C4N C5\n" + "\n".join(f" {int(v[0])} {v[1]:.1f} {int(v[2])} {int(v[3])} {int(v[4])} {int(v[5])} {int(v[6])} {int(v[7])} {int(v[8])}" for v in data) + "\n"
+                        lines = []
+                        lines.append(f"Well:           {well_name}")
+                        lines.append("")  # empty line
+                        lines.append("   MD     ROP      TG      C1      C2      C3     C4I     C4N      C5")
+            
+                        for v in data:
+                            # MD right-aligned width 6, ROP 1 decimal width 7, others integers width 7-8
+                            line = (
+                            f"{int(v[0]):6d} "          # MD
+                            f"{v[1]:7.1f} "             # ROP
+                            f"{int(v[2]):7d} "          # TG
+                            f"{int(v[3]):7d} "          # C1
+                            f"{int(v[4]):7d} "          # C2
+                            f"{int(v[5]):7d} "          # C3
+                            f"{int(v[6]):7d} "          # C4I
+                            f"{int(v[7]):7d} "          # C4N
+                            f"{int(v[8]):7d}"           # C5
+                        )
+                        lines.append(line)
+                    
+                    prn5_content = "\n".join(lines) + "\n"
 
     
     # ─── Previews & Downloads ────────────────────────────────────────────────
