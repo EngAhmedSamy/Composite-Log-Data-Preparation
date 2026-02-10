@@ -166,64 +166,68 @@ else:
             st.success(f"Removed {len(to_delete)} row(s)")
             st.rerun()
 
+
+
 # ────────────────────────────────────────────────
 #   OCR from mud log (kept as before)
 # ────────────────────────────────────────────────
-st.subheader("Import from Mud Log (optional)")
+# st.subheader("Import from Mud Log (optional)")
 
-uploaded_file = st.file_uploader("PDF or Image", type=["pdf","png","jpg","jpeg"])
+# uploaded_file = st.file_uploader("PDF or Image", type=["pdf","png","jpg","jpeg"])
 
-if uploaded_file:
-    try:
-        content = uploaded_file.read()
-        images = []
+# if uploaded_file:
+#     try:
+#         content = uploaded_file.read()
+#         images = []
 
-        if uploaded_file.type == "application/pdf":
-            images = convert_from_bytes(content)
-        else:
-            from io import BytesIO
-            import numpy as np
-            img = Image.open(BytesIO(content))
-            images = [img]
+#         if uploaded_file.type == "application/pdf":
+#             images = convert_from_bytes(content)
+#         else:
+#             from io import BytesIO
+#             import numpy as np
+#             img = Image.open(BytesIO(content))
+#             images = [img]
 
-        text = ""
-        for img_pil in images:
-            img_cv = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
-            gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            text += pytesseract.image_to_string(thresh) + "\n"
+#         text = ""
+#         for img_pil in images:
+#             img_cv = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+#             gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+#             _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+#             text += pytesseract.image_to_string(thresh) + "\n"
 
-        # Simple parsing – improve later if needed
-        parsed = []
-        for line in text.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            parts = re.split(r'\s{2,}', line)
-            if len(parts) >= 3:
-                casing = parts[1] if len(parts) > 1 else ""
-                try:
-                    depth = int(float(parts[-1].replace(',', '')))
-                    for t in csg_types:
-                        if t.replace('"','') in casing or casing in t.replace('"',''):
-                            parsed.append({"Type": t, "Depth In": depth})
-                            break
-                except:
-                    pass
+#         # Simple parsing – improve later if needed
+#         parsed = []
+#         for line in text.splitlines():
+#             line = line.strip()
+#             if not line:
+#                 continue
+#             parts = re.split(r'\s{2,}', line)
+#             if len(parts) >= 3:
+#                 casing = parts[1] if len(parts) > 1 else ""
+#                 try:
+#                     depth = int(float(parts[-1].replace(',', '')))
+#                     for t in csg_types:
+#                         if t.replace('"','') in casing or casing in t.replace('"',''):
+#                             parsed.append({"Type": t, "Depth In": depth})
+#                             break
+#                 except:
+#                     pass
 
-        if parsed:
-            new_df = pd.DataFrame(parsed)
-            st.session_state.csg_data = pd.concat(
-                [st.session_state.csg_data, new_df],
-                ignore_index=True
-            ).drop_duplicates(subset=["Type", "Depth In"]).reset_index(drop=True)
-            st.success(f"Imported {len(parsed)} matching entries")
-            st.rerun()
-        else:
-            st.info("No recognizable casing data found in the file.")
+#         if parsed:
+#             new_df = pd.DataFrame(parsed)
+#             st.session_state.csg_data = pd.concat(
+#                 [st.session_state.csg_data, new_df],
+#                 ignore_index=True
+#             ).drop_duplicates(subset=["Type", "Depth In"]).reset_index(drop=True)
+#             st.success(f"Imported {len(parsed)} matching entries")
+#             st.rerun()
+#         else:
+#             st.info("No recognizable casing data found in the file.")
 
-    except Exception as e:
-        st.error(f"Could not process file: {str(e)}")
+#     except Exception as e:
+#         st.error(f"Could not process file: {str(e)}")
+
+
 
 # ────────────────────────────────────────────────
 #   PNG generation & downloads (unchanged logic)
