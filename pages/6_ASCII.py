@@ -506,11 +506,11 @@ if uploaded_file is not None:
                         except (ValueError, TypeError):
                             continue
 
-                if data:
-                    prn1_content = f" Well:  {well_name}\n   MD     WOB     RPM\n" + "\n".join(f"   {int(d)}      {int(w)}       {int(r)}" for d, w, r in data) + "\n"
-                    st.subheader("ASCII 1 Preview (first 20 lines)")
-                    preview_lines = prn1_content.split("\n")[:20]
-                    st.text("\n".join(preview_lines))
+               # if data:
+                   # prn1_content = f" Well:  {well_name}\n   MD     WOB     RPM\n" + "\n".join(f"   {int(d)}      {int(w)}       {int(r)}" for d, w, r in data) + "\n"
+                  #  st.subheader("ASCII 1 Preview (first 20 lines)")
+                   # preview_lines = prn1_content.split("\n")[:20]
+                  #  st.text("\n".join(preview_lines))
 
 
 
@@ -568,21 +568,41 @@ if uploaded_file is not None:
                         except (ValueError, TypeError):
                             continue
 
-                if data:
-                    prn5_content = f" Well:           {well_name}\n   MD     ROP      TG      C1      C2      C3     C4I     C4N      C5\n" + "\n".join(f"   {int(v[0])}    {v[1]:.1f}     {int(v[2])}       {int(v[3])}       {int(v[4])}       {int(v[5])}       {int(v[6])}       {int(v[7])}       {int(v[8])}" for v in data) + "\n"
-                    st.subheader("ASCII 5 Preview (first 20 lines)")
-                    preview_lines = prn5_content.split("\n")[:20]
-                    st.text("\n".join(preview_lines))
+               # if data:
+                #    prn5_content = f" Well:           {well_name}\n   MD     ROP      TG      C1      C2      C3     C4I     C4N      C5\n" + "\n".join(f"   {int(v[0])}    {v[1]:.1f}     {int(v[2])}       {int(v[3])}       {int(v[4])}       {int(v[5])}       {int(v[6])}       {int(v[7])}       {int(v[8])}" for v in data) + "\n"
+                 #   st.subheader("ASCII 5 Preview (first 20 lines)")
+                  #  preview_lines = prn5_content.split("\n")[:20]
+                  #  st.text("\n".join(preview_lines))
 
     # ─── Download buttons ────────────────────────────────────────────────────
     # ─── ASCII 1 Preview ─────────────────────────────────────────────────────
 if prn1_content:
-    st.subheader("ASCII 1 PRN Preview (full content - copy-paste ready)")
-
+    st.subheader("ASCII 1 PRN Preview (scroll to see full content- copy-paste ready)")
     st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
-    # Show the complete content in a monospaced code block
-    st.code(prn1_content, language="text")
-    
+    # Create a scrollable container with fixed height
+    with st.container():
+        st.markdown(
+            """
+            <div style="
+                height: 400px;                /* adjust height as you prefer: 300px, 500px, etc. */
+                overflow-y: auto;             /* vertical scroll */
+                overflow-x: auto;             /* horizontal scroll if needed */
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 14px;
+                padding: 16px;
+                border-radius: 6px;
+                border: 1px solid #444;
+                white-space: pre;
+                line-height: 1.4;
+            ">
+            """ + prn1_content.replace("\n", "<br>").replace(" ", "&nbsp;") + """
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
     st.download_button(
         label="Download Mud Log Ascii 1.prn",
         data=prn1_content,
@@ -593,12 +613,32 @@ if prn1_content:
 
 # ─── ASCII 5 Preview ─────────────────────────────────────────────────────
 if prn5_content:
-    st.subheader("ASCII 5 PRN Preview (full content - copy-paste ready)")
-
+    st.subheader("ASCII 5 PRN Preview (scroll to see full content- copy-paste ready)")
     st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
-    # Show the complete content in a monospaced code block
-    st.code(prn5_content, language="text")
-    
+    # Same scrollable container style for ASCII 5
+    with st.container():
+        st.markdown(
+            """
+            <div style="
+                height: 400px;
+                overflow-y: auto;
+                overflow-x: auto;
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 14px;
+                padding: 16px;
+                border-radius: 6px;
+                border: 1px solid #444;
+                white-space: pre;
+                line-height: 1.4;
+            ">
+            """ + prn5_content.replace("\n", "<br>").replace(" ", "&nbsp;") + """
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
     st.download_button(
         label="Download Mud Log Ascii 5.prn",
         data=prn5_content,
