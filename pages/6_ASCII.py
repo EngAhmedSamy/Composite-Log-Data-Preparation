@@ -1231,4 +1231,115 @@ with tab_desc_comment:
 # ────────────────────────────────────────────────
 with tab_oil_shows:
     st.header("Oil Shows Intensity")
-    st.info("Oil shows intensity preparation coming soon. Likely includes depth, intensity level, fluorescence, etc.")
+    st.info("Add one or more depth ranges with intensity to generate the PRN file.")
+    
+    # Global well name
+    well_name = st.session_state.get('well_name', 'Unknown Well')
+    st.info(f"Using well name: **{well_name}** (set in previous tabs)")
+    
+    # Session state for ranges (to persist across reruns)
+    if 'oil_ranges' not in st.session_state:
+        st.session_state.oil_ranges = []
+    
+    # Add range form
+    with st.form("add_range_form"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            from_depth = st.number_input("From Depth", min_value=0, step=1, key="from_depth")
+        with col2:
+            to_depth = st.number_input("To Depth", min_value=0, step=1, key="to_depth")
+        with col3:
+            intensity = st.selectbox("Intensity", [10, 20, 30], key="intensity")
+        
+        submitted = st.form_submit_button("Add Range")
+        if submitted and from_depth <= to_depth:
+            st.session_state.oil_ranges.append((from_depth, to_depth, intensity))
+            st.success(f"Added range {from_depth}-{to_depth} @ {intensity}")
+            st.rerun()
+    
+    # Display and manage ranges
+    st.subheader("Added Ranges")
+    if st.session_state.oil_ranges:
+        for i, (fr, to, inty) in enumerate(st.session_state.oil_ranges):
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("From", fr)
+            col2.metric("To", to)
+            col3.metric("Intensity", inty)
+            if col4.button(f"Remove", key=f"remove_{i}"):
+                del st.session_state.oil_ranges[i]
+                st.rerun()
+    else:
+        st.info("No ranges added yet. Add one above.")
+    
+    # Generate PRN if ranges exist
+    if st.session_state.oil_ranges:
+        if st.button("Generate PRN"):
+            # Sort ranges by from_depth
+            sorted_ranges = sorted(st.session_state.oil_ranges, key=lambda x: x[0])
+            
+            lines = [f"Well: {well_name}"]
+            lines.append("Depth                   Shows")
+            
+            last_to = None
+            for i, (from_d, to_d, intensity) in enumerate(sorted_ranges):
+                # Add separator 0 before this range if needed
+                if last_to is None or last_to + 1 < from_d:
+                    sep_depth = from_d - 1
+                    lines.append(f"{sep_depth:>6}                       0")
+                
+                # Add the range with intensity
+                for d in range(from_d, to_d + 1):
+                    lines.append(f"{d:>6}                      {intensity}")
+                
+                last_to = to_d
+            
+            # Always add final separator after last range
+            if last_to is not None:
+                final_sep = last_to + 1
+                lines.append(f"{final_sep:>6}                       0")
+            
+            prn_content = "\n".join(lines) + "\n"
+            
+            # ─── Preview ────────────────────────────────────────────────────────────
+            st.subheader("Oil Shows Intensity PRN Preview (scroll to see full content - copy-paste ready)")
+            st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
+            
+            with st.container():
+                st.markdown(
+                    f"""
+                    <div style="
+                        height: 400px;
+                        overflow-y: auto;
+                        overflow-x: auto;
+                        background-color: #1e1e1e;
+                        color: #d4d4d4;
+                        font-family: 'Courier New', Courier, monospace;
+                        font-size: 14px;
+                        padding: 16px;
+                        border-radius: 6px;
+                        border: 1px solid #444;
+                        white-space: pre;
+                        line-height: 1.4;
+                    ">
+                    {prn_content.replace("\n", "<br>").replace(" ", "&nbsp;")}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            
+            # ─── Download ──────────────────────────────────────────────────────────
+            st.download_button(
+                label="Download Oil Shows Intensity .prn",
+                data=prn_content,
+                file_name=f"{well_name} Oil Shows Intensity.prn",
+                mime="text/plain",
+                key="oil_shows_download"
+            )
+            
+            # Clear button
+            if st.button("Clear All Ranges"):
+                st.session_state.oil_ranges = []
+                st.rerun()
+    else:
+        st.info("Add ranges above to generate the PRN.")
+
