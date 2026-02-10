@@ -790,6 +790,7 @@ with tab_mud_drlg_params:
                 st.warning(f"Drilling sheet error: {e}")
         
         # ─── Process Mud Parameters ─────────────────────────────────────────────
+        # ─── Process Mud Parameters ─────────────────────────────────────────────
         if mud_sheet:
             try:
                 df = pd.read_excel(wb, sheet_name=mud_sheet, header=None, dtype=str, keep_default_na=False)
@@ -801,14 +802,24 @@ with tab_mud_drlg_params:
                     text_parts = []
                     for val in row:
                         val_str = str(val).strip()
-                        if val_str and val_str.replace('.', '', 1).isdigit() and depth_v is None:
+                        # Look for depth (first numeric value)
+                        if depth_v is None and val_str and val_str.replace('.', '', 1).replace('-', '', 1).isdigit():
                             depth_v = val_str
-                        elif val:
-                            text_parts.append(str(val))  # no strip
+                        # Collect text (skip empty)
+                        elif val_str:
+                            # Replace internal line breaks with space
+                            cleaned_text = val_str.replace('\n', ' ').replace('\r', ' ').strip()
+                            if cleaned_text:
+                                text_parts.append(cleaned_text)
+                    
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = '"' + ' '.join([str(p).strip() for p in text_parts]).strip() + '"'  # 13 spaces for mud
+                            # Join all parts with SINGLE space → becomes one line
+                            param_text = ' '.join(text_parts)
+                            # Optional: add extra space around colons if needed
+                            param_text = param_text.replace(':', ': ')
+                            quoted_text = f'"{param_text}"'
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -817,11 +828,17 @@ with tab_mud_drlg_params:
                     lines = [f"Well: {well_name}"]
                     for d, quoted in data:
                         d2 = d + 20
-                        line = f"{d:<10}{d2:<10}{quoted}"
+                        # Use wider columns for better alignment
+                        line = f"{d:<18}{d2:<18}{quoted}"
                         lines.append(line)
                     mud_prn = "\n".join(lines) + "\n"
+                    st.success(f"Mud parameters processed: {len(data)} entries")
+                else:
+                    st.warning("No valid mud data found (check depth and text columns)")
             except Exception as e:
-                st.warning(f"Mud sheet error: {e}")
+                st.error(f"Mud processing failed: {str(e)}")
+
+        
         
         # ─── Previews & Downloads ────────────────────────────────────────────────
         if drilling_prn or mud_prn:
