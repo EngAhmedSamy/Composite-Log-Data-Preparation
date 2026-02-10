@@ -750,7 +750,7 @@ with tab_mud_drlg_params:
                 mud_sheet = s
         
         # ─── Helper function: format parameters in fixed-width columns ──────────
-        def build_quoted_text(parts, field_width=30):
+        def build_quoted_text(parts, field_width=20):
             """
             Builds a quoted string where EVERY parameter starts at the same column position.
             Each parameter (label + value) is padded to exactly 'field_width' characters.
@@ -805,7 +805,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, field_width=30)  # ← key line
+                            quoted_text = build_quoted_text(text_parts, field_width=20)  # ← key line
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -844,7 +844,7 @@ with tab_mud_drlg_params:
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, field_width=30)  # ← same width
+                            quoted_text = build_quoted_text(text_parts, field_width=20)  # ← same width
                             data.append((d, quoted_text))
                         except:
                             continue
