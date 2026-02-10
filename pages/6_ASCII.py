@@ -6,7 +6,62 @@ import zipfile
 import openpyxl  # for merged cells and better cell access
 import math
 
-st.title("6 - ASCII")
+
+st.sidebar.markdown("---")
+st.sidebar.header("Global Settings")
+
+well_name_input = st.sidebar.text_input(
+    "Well Name",
+    value=st.session_state.get('well_name', 'ABRAR-84'),
+    key="well_name_input"
+)
+
+if st.sidebar.button("Apply Well Name", type="primary"):
+    if well_name_input.strip():
+        st.session_state.well_name = well_name_input.strip()
+        # Place success message here - it will show until next rerun or page change
+        st.sidebar.success(f"Well Name: **{st.session_state.well_name}** applied ✅")
+       # st.rerun()  # optional - removes it faster but refreshes the app
+    else:
+        st.sidebar.error("Please enter a well name")
+# Now every tab can use st.session_state.well_name
+
+
+# ─── Sidebar Copyright / Watermark Footer (visible on ALL pages) ──────────
+#st.sidebar.markdown("---")  # separator line above the copyright
+st.sidebar.markdown("---")
+st.sidebar.markdown(
+    """
+    <div style="
+        text-align: center; 
+        color: #888; 
+        font-size: 0.85rem; 
+        padding: 12px 8px; 
+        margin-top: auto;
+        border-top: 1px solid #444;
+    ">
+        © 2026 Ahmed Samy<br>
+        Composite Log Data Preparation App<br>
+        Proprietary Software – All Rights Reserved<br>
+        Private Property – For internal use only<br>
+        Copyright protected – Do not distribute
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
+st.set_page_config(page_title="Petrel Composite Log Prep", layout="wide", page_icon="🛢️")  # optional)
+                   
+st.title("Petrel Composite Log Data Preparation App")
+st.markdown("### Tab 6: ASCII (Preparing All ASCII Files)")
+
+
+
+
+
+#st.title("6 - ASCII")
 
 # Sub-tabs for the different ASCII categories
 tab_gyro, tab_fm_tops, tab_mud_log_ascii, tab_mud_drlg_params, tab_desc_comment, tab_oil_shows = st.tabs([
