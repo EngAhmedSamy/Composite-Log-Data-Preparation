@@ -689,7 +689,11 @@ with tab_mud_log_ascii:
 with tab_mud_drlg_params:
     st.header("Mud & Drilling Parameters")
     
-    uploaded_file = st.file_uploader("Upload Excel File (.xls or .xlsx)", type=["xls", "xlsx"])
+    uploaded_file = st.file_uploader(
+        "Upload Excel File (.xls or .xlsx) for Mud & Drilling Parameters",
+        type=["xls", "xlsx"],
+        key="mud_drlg_params_uploader"  # unique key to avoid duplicate ID error
+    )
     
     if uploaded_file is not None:
         file_bytes = uploaded_file.read()
@@ -700,7 +704,7 @@ with tab_mud_drlg_params:
         drilling_prn = None
         mud_prn = None
         
-        # ─── Try modern .xlsx first ──────────────────────────────────────────────
+        # Load workbook
         try:
             wb = pd.ExcelFile(io.BytesIO(file_bytes), engine="openpyxl")
             sheet_names = wb.sheet_names
@@ -715,7 +719,7 @@ with tab_mud_drlg_params:
                 st.error("Please open in Excel → Save As → .xlsx format and try again.")
                 st.stop()
         
-        # Find well name if not in session (search all sheets)
+        # Find well name if missing
         if well_name == 'Unknown Well':
             for sheet_name in sheet_names:
                 try:
@@ -735,42 +739,42 @@ with tab_mud_drlg_params:
                 if well_name != "Unknown Well":
                     break
         
-        # Find sheets for drilling and mud
+        # Find sheets (more flexible matching)
         drilling_sheet = None
         mud_sheet = None
         for s in sheet_names:
-            s_lower = s.lower()
-            if 'drilling' in s_lower:
+            s_lower = s.lower().strip()
+            if any(word in s_lower for word in ['drilling', 'drlg', 'drill', 'param']):
                 drilling_sheet = s
-            elif 'mud' in s_lower:
+            elif any(word in s_lower for word in ['mud', 'mw', 'vis', 'cl']):
                 mud_sheet = s
         
-        # Process Drilling sheet
+        # ─── Process Drilling Parameters ────────────────────────────────────────
         if drilling_sheet:
             try:
-                df_drlg = pd.read_excel(wb, sheet_name=drilling_sheet, header=None, dtype=str, keep_default_na=False)
-                st.success(f"Drilling sheet loaded: {drilling_sheet}")
+                df = pd.read_excel(wb, sheet_name=drilling_sheet, header=None, dtype=str, keep_default_na=False)
+                st.success(f"Drilling parameters sheet loaded: {drilling_sheet}")
                 
-                # Find rows with numeric depth in first columns
                 data = []
-                for _, row in df_drlg.iterrows():
+                for _, row in df.iterrows():
                     depth_v = None
-                    for j, val in enumerate(row):
+                    text_parts = []
+                    for val in row:
                         val_str = str(val).strip()
-                        if val_str.isdigit():
-                            depth_v = val_str
-                            # Concatenate all subsequent non-empty cells with spaces
-                            text_parts = []
-                            for k in range(j + 1, len(row)):
-                                part = str(row[k]).strip()
-                                if part:
-                                    text_parts.append(part)
-                            t = '             '.join(text_parts)  # join with multiple spaces for alignment
-                            break
-                    if depth_v and t:
+                        if val_str and val_str.replace('.', '', 1).isdigit():  # numeric (allow decimal)
+                            if depth_v is None:
+                                depth_v = val_str
+                            else:
+                                text_parts.append(val_str)
+                        elif val_str:
+                            text_parts.append(val_str)
+                    
+                    if depth_v and text_parts:
                         try:
-                            d = int(depth_v)
-                            data.append((d, t))
+                            d = int(float(depth_v))
+                            t = ' '.join(text_parts).strip()  # join with single space, clean
+                            if t:
+                                data.append((d, t))
                         except:
                             continue
                 
@@ -784,30 +788,32 @@ with tab_mud_drlg_params:
             except Exception as e:
                 st.warning(f"Could not process Drilling sheet: {e}")
         
-        # Process Mud sheet
+        # ─── Process Mud Parameters ─────────────────────────────────────────────
         if mud_sheet:
             try:
-                df_mud = pd.read_excel(wb, sheet_name=mud_sheet, header=None, dtype=str, keep_default_na=False)
-                st.success(f"Mud sheet loaded: {mud_sheet}")
+                df = pd.read_excel(wb, sheet_name=mud_sheet, header=None, dtype=str, keep_default_na=False)
+                st.success(f"Mud parameters sheet loaded: {mud_sheet}")
                 
                 data = []
-                for _, row in df_mud.iterrows():
+                for _, row in df.iterrows():
                     depth_v = None
-                    for j, val in enumerate(row):
+                    text_parts = []
+                    for val in row:
                         val_str = str(val).strip()
-                        if val_str.isdigit():
-                            depth_v = val_str
-                            text_parts = []
-                            for k in range(j + 1, len(row)):
-                                part = str(row[k]).strip()
-                                if part:
-                                    text_parts.append(part)
-                            t = '             '.join(text_parts)
-                            break
-                    if depth_v and t:
+                        if val_str and val_str.replace('.', '', 1).isdigit():
+                            if depth_v is None:
+                                depth_v = val_str
+                            else:
+                                text_parts.append(val_str)
+                        elif val_str:
+                            text_parts.append(val_str)
+                    
+                    if depth_v and text_parts:
                         try:
-                            d = int(depth_v)
-                            data.append((d, t))
+                            d = int(float(depth_v))
+                            t = ' '.join(text_parts).strip()
+                            if t:
+                                data.append((d, t))
                         except:
                             continue
                 
@@ -857,7 +863,7 @@ with tab_mud_drlg_params:
                     data=drilling_prn,
                     file_name=f"{well_name} Drilling Parameters.prn",
                     mime="text/plain",
-                    key="drlg_dl"
+                    key="drlg_params_download"
                 )
             
             if mud_prn:
@@ -892,14 +898,16 @@ with tab_mud_drlg_params:
                     data=mud_prn,
                     file_name=f"{well_name} Mud Parameters.prn",
                     mime="text/plain",
-                    key="mud_dl"
+                    key="mud_params_download"
                 )
             
             if drilling_prn and mud_prn:
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                    zf.writestr(f"{well_name} Drilling Parameters.prn", drilling_prn)
-                    zf.writestr(f"{well_name} Mud Parameters.prn", mud_prn)
+                    if drilling_prn:
+                        zf.writestr(f"{well_name} Drilling Parameters.prn", drilling_prn)
+                    if mud_prn:
+                        zf.writestr(f"{well_name} Mud Parameters.prn", mud_prn)
                 zip_buffer.seek(0)
                 
                 st.download_button(
@@ -907,7 +915,7 @@ with tab_mud_drlg_params:
                     data=zip_buffer,
                     file_name=f"{well_name} Mud & Drilling Parameters.zip",
                     mime="application/zip",
-                    key="mud_drlg_zip"
+                    key="mud_drlg_zip_download"
                 )
 
 
