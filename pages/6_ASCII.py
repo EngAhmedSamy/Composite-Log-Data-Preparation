@@ -579,14 +579,19 @@ if uploaded_file is not None:
 # ───────────────────────────────────────────────────────────────
 # ONLY SHOW ASCII PREVIEWS & DOWNLOADS IN THE ASCII TAB
 # ───────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────
+# ONLY SHOW ASCII PREVIEWS & DOWNLOADS IN THE ASCII TAB
+# ───────────────────────────────────────────────────────────────
+
 if prn1_content or prn5_content:
     st.markdown("---")  # optional separator
 
-if prn1_content:
-    st.subheader("ASCII 1 PRN Preview (scroll to see full content- copy-paste ready)")
-    st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
-    # Create a scrollable container with fixed height
-   with st.container():
+    # ─── ASCII 1 Preview ─────────────────────────────────────────────────────
+    if prn1_content:
+        st.subheader("ASCII 1 PRN Preview (scroll to see full content - copy-paste ready)")
+        st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
+    # Create a scrollable container with fixed height    
+        with st.container():
             st.markdown(
                 """
                 <div style="
@@ -614,15 +619,15 @@ if prn1_content:
             data=prn1_content,
             file_name=f"{well_name} Mud Log Ascii 1.prn",
             mime="text/plain",
-            key="ascii_download_1_unique"   # ← make key unique
+            key="ascii_download_1_unique"
         )
 
-# ─── ASCII 5 Preview ─────────────────────────────────────────────────────
-if prn5_content:
-    st.subheader("ASCII 5 PRN Preview (scroll to see full content- copy-paste ready)")
-    st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
-    # Same scrollable container style for ASCII 5
-    with st.container():
+    # ─── ASCII 5 Preview ─────────────────────────────────────────────────────
+    if prn5_content:
+        st.subheader("ASCII 5 PRN Preview (scroll to see full content - copy-paste ready)")
+        st.caption("Scroll down to see the full content. Use Ctrl+F to search within the preview.")
+        
+        with st.container():
             st.markdown(
                 """
                 <div style="
@@ -650,11 +655,11 @@ if prn5_content:
             data=prn5_content,
             file_name=f"{well_name} Mud Log Ascii 5.prn",
             mime="text/plain",
-            key="ascii_download_5_unique"   # ← make key unique
+            key="ascii_download_5_unique"
         )
 
-# ─── Combined ZIP Download ───────────────────────────────────────────────
-if prn1_content and prn5_content:
+    # ─── Combined ZIP Download ───────────────────────────────────────────────
+    if prn1_content and prn5_content:
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr(f"{well_name} Mud Log Ascii 1.prn", prn1_content)
@@ -666,9 +671,8 @@ if prn1_content and prn5_content:
             data=zip_buffer,
             file_name=f"{well_name} Mud Log Ascii 1 & 5.zip",
             mime="application/zip",
-            key="ascii_zip_download_unique"   # ← unique key
+            key="ascii_zip_download_unique"
         )
-
 
 
 
