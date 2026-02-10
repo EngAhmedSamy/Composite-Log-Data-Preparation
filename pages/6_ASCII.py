@@ -1027,43 +1027,32 @@ with tab_desc_comment:
         
         # ─── Define lithology types and keywords ─────────────────────────────────
         lith_keywords = {
-            'SST':      ['sst', 's.st', 'sandstone', 's.st.'],
-            'CLY':      ['cly', 'clay'],
-            'SLTST':    ['sltst', 'slt.st', 'siltstone', 'sltst.'],
-            'SH':       ['shale', 'sh '],  # space after 'sh' to avoid matching "shows"
-            'LST':      ['lst', 'limestone'],
-            'DOL':      ['dol', 'dolomite'],
-            'OIL SHOWS':['oil shows', 'oil show', 'oilshows', 'oil-show'],
-            'SD':       ['sd', 'sand', 'sd ']
+            'SST': ['sst', 's.st'],
+            'CLY': ['cly', 'clay'],
+            'SLTST': ['sltst', 'slt.st', 'siltstone'],
+            'SH': ['sh', 'shale'],
+            'LST': ['lst', 'limestone'],
+            'DOL': ['dol', 'dolomite'],
+            'OIL SHOWS': ['oil shows', 'oil show', 'oil'],
+            'SD': ['sd', 'sand']
         }
         
         # ─── Find sheets ─────────────────────────────────────────────────────────
         lith_sheets = {}  # lith_type -> sheet_name
-      
-        # First pass: look for exact or strong matches
-        for lith_type, keywords in lith_keywords.items():
-            for s in sheet_names:
-                s_lower = s.lower().strip()
-                if any(kw in s_lower for kw in keywords):
-                    # Prefer sheets that contain the full type name or very specific keyword
-                    if lith_type.upper() in s.upper() or any(kw.upper() in s.upper() for kw in keywords if len(kw) > 3):
-                        lith_sheets[lith_type] = s
-                        break
+        for s in sheet_names:
+            s_lower = s.lower().strip().replace('.', '').replace(' ', '')
+            for lith_type, kws in lith_keywords.items():
+                if any(kw.replace('.', '').replace(' ', '') in s_lower for kw in kws):
+                    lith_sheets[lith_type] = s
+                    break
         
-        # Second pass fallback: only assign if not already assigned
-        for lith_type, keywords in lith_keywords.items():
-            if lith_type not in lith_sheets:
-                for s in sheet_names:
-                    s_lower = s.lower().strip()
-                    if any(kw in s_lower for kw in keywords):
-                        lith_sheets[lith_type] = s
-                        break
-        
-        # ─── Special handling: OIL SHOWS and SD fall back to SST if no dedicated sheet ─────────
+        # ─── Special handling for OIL SHOWS and SD if no dedicated sheet ─────────
         sst_sheet = lith_sheets.get('SST')
         if sst_sheet:
+            # If no OIL SHOWS sheet, search in SST
             if 'OIL SHOWS' not in lith_sheets:
                 lith_sheets['OIL SHOWS'] = sst_sheet
+            # If no SD sheet, search in SST
             if 'SD' not in lith_sheets:
                 lith_sheets['SD'] = sst_sheet
         
@@ -1096,25 +1085,12 @@ with tab_desc_comment:
                             desc = str(desc_v).replace('\n', ' ').replace('\r', ' ').strip()
                             desc_lower = desc.lower()
                             
-                            # Filter logic:
-                            # - If this is SST sheet, exclude lines that belong to OIL SHOWS or SD
-                            # - But allow them if this is the dedicated OIL SHOWS / SD sheet
-                            skip = False
-                            if lith_sheet == sst_sheet and lith_type == 'SST':
-                                # In SST sheet, skip OIL SHOWS and SD lines
-                                if desc_lower.startswith('w/') or desc_lower.startswith('sd'):
-                                    skip = True
-                            
-                            # For OIL SHOWS and SD when using SST sheet
-                            if lith_type == 'OIL SHOWS' and lith_sheet == sst_sheet:
-                                if not desc_lower.startswith('w/'):
-                                    skip = True
-                            if lith_type == 'SD' and lith_sheet == sst_sheet:
-                                if not desc_lower.startswith('sd'):
-                                    skip = True
-                            
-                            if skip:
-                                continue
+                            # Special filter for OIL SHOWS and SD when in SST sheet
+                            if lith_type in ['OIL SHOWS', 'SD'] and lith_sheet == sst_sheet:
+                                if lith_type == 'OIL SHOWS' and not desc_lower.startswith('w/'):
+                                    continue
+                                if lith_type == 'SD' and not desc_lower.startswith('sd'):
+                                    continue
                             
                             try:
                                 d = int(float(depth_v))
