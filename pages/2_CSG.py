@@ -303,3 +303,8 @@ if not st.session_state.csg_data.empty:
         file_name="csg_all.zip",
         mime="application/zip"
     )
+    
+else:
+    st.info("Add at least one CSG above to generate previews/downloads.")
+
+
