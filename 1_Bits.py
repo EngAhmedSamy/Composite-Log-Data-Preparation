@@ -13,6 +13,7 @@ import re
 ## Sidebar - Global Well Name
 # Sidebar
 st.sidebar.markdown("---")
+
 st.sidebar.header("Global Settings")
 
 well_name_input = st.sidebar.text_input(
@@ -34,7 +35,7 @@ if st.sidebar.button("Apply Well Name", type="primary"):
 # ─── Sidebar Copyright / Watermark Footer (visible on ALL pages) ──────────
 
 st.sidebar.markdown("---")  # separator line above the copyright
-st.sidebar.markdown("---")
+
 st.sidebar.markdown(
     """
     <div style="
@@ -54,7 +55,6 @@ st.sidebar.markdown(
     """,
     unsafe_allow_html=True
 )
-
 
 
 
