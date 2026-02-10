@@ -571,19 +571,19 @@ with tab_mud_log_ascii:
                         for v in data:
                             # MD right-aligned width 6, ROP 1 decimal width 7, others integers width 7-8
                             line = (
-                            f"{int(v[0]):6d} "          # MD
-                            f"{v[1]:7.1f} "             # ROP
-                            f"{int(v[2]):7d} "          # TG
-                            f"{int(v[3]):7d} "          # C1
-                            f"{int(v[4]):7d} "          # C2
-                            f"{int(v[5]):7d} "          # C3
-                            f"{int(v[6]):7d} "          # C4I
-                            f"{int(v[7]):7d} "          # C4N
-                            f"{int(v[8]):7d}"           # C5
-                        )
-                        lines.append(line)
-                    
-                    prn5_content = "\n".join(lines) + "\n"
+                                f"{int(v[0]):6d} "          # MD
+                                f"{v[1]:7.1f} "             # ROP
+                                f"{int(v[2]):7d} "          # TG
+                                f"{int(v[3]):7d} "          # C1
+                                f"{int(v[4]):7d} "          # C2
+                                f"{int(v[5]):7d} "          # C3
+                                f"{int(v[6]):7d} "          # C4I
+                                f"{int(v[7]):7d} "          # C4N
+                                f"{int(v[8]):7d}"           # C5
+                            )
+                            lines.append(line)
+                        
+                        prn5_content = "\n".join(lines) + "\n"
 
     
     # ─── Previews & Downloads ────────────────────────────────────────────────
