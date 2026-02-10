@@ -1039,12 +1039,30 @@ with tab_desc_comment:
         
         # ─── Find sheets ─────────────────────────────────────────────────────────
         lith_sheets = {}  # lith_type -> sheet_name
-        for s in sheet_names:
-            s_lower = s.lower().strip().replace('.', '').replace(' ', '')
-            for lith_type, kws in lith_keywords.items():
-                if any(kw.replace('.', '').replace(' ', '') in s_lower for kw in kws):
-                    lith_sheets[lith_type] = s
-                    break
+        # Priority list: process SH early to give it preference over OIL SHOWS
+        priority_lith_types = ['SH'] + [lt for lt in lith_keywords if lt != 'SH']
+        
+        for lith_type in priority_lith_types:
+            keywords = lith_keywords[lith_type]
+            for s in sheet_names:
+                s_lower = s.lower().strip().replace('.', '').replace(' ', '')
+                if any(kw in s_lower for kw in keywords):
+                    # Strong preference: exact or full name match
+                    if lith_type.upper() in s.upper() or any(kw.upper() in s.upper() for kw in keywords if len(kw) > 3):
+                        lith_sheets[lith_type] = s
+                        break
+        
+        # Second pass: fallback for remaining types
+        for lith_type in lith_keywords:
+            if lith_type not in lith_sheets:
+                keywords = lith_keywords[lith_type]
+                for s in sheet_names:
+                    s_lower = s.lower().strip().replace('.', '').replace(' ', '')
+                    if any(kw in s_lower for kw in keywords):
+                        lith_sheets[lith_type] = s
+                        break
+        
+        st.write("Assigned lithology sheets:", lith_sheets)  # debug - remove later if not needed
         
         # ─── Special handling for OIL SHOWS and SD ────────────────────────────────
         sst_sheet = lith_sheets.get('SST')
