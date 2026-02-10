@@ -8,6 +8,22 @@ import cv2
 import pytesseract
 import re
 
+
+# Sidebar watermark (always visible)
+with st.sidebar:
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style="text-align: center; color: #aaa; font-size: 0.85rem; padding: 10px 0;">
+            © 2026 Ahmed Samy<br>
+            Composite Log Data Preparation App<br>
+            Proprietary – All Rights Reserved<br>
+            Private Use Only – Do Not Distribute
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
 # Global well name in sidebar
 ## Sidebar - Global Well Name
 # Sidebar
