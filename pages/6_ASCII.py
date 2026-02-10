@@ -767,14 +767,19 @@ with tab_mud_drlg_params:
                     text_parts = []
                     for val in row:
                         val_str = str(val).strip()
-                        if val_str and val_str.replace('.', '', 1).replace('-', '', 1).isdigit() and depth_v is None:
+                        if depth_v is None and val_str and val_str.replace('.', '', 1).replace('-', '', 1).isdigit():
                             depth_v = val_str
-                        elif val:
-                            text_parts.append(str(val))  # no strip to preserve any spaces
+                        elif val_str:
+                            cleaned_text = val_str.replace('\n', ' ').replace('\r', ' ').strip()
+                            if cleaned_text:
+                                text_parts.append(cleaned_text)
+                    
                     if depth_v and text_parts:
                         try:
                             d = int(float(depth_v))
-                            quoted_text = build_quoted_text(text_parts, space_count=8)  # 10 spaces for drilling
+                            param_text = ' '.join(text_parts)
+                            param_text = param_text.replace(':', ': ')
+                            quoted_text = f'"{param_text}"'
                             data.append((d, quoted_text))
                         except:
                             continue
