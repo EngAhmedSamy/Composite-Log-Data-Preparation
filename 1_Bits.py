@@ -92,50 +92,50 @@ with st.expander("Override bit icons (optional)"):
 # ────────────────────────────────────────────────
 # Section: Upload mud log file (PDF or image) for OCR
 # ────────────────────────────────────────────────
-mud_log = st.file_uploader("Upload Mud Log File (PDF or Image for OCR extraction)", type=["pdf", "png", "jpg", "jpeg"])
-if mud_log:
-    try:
-        file_bytes = mud_log.getvalue()
-        file_type = mud_log.type
-        images = []
+# mud_log = st.file_uploader("Upload Mud Log File (PDF or Image for OCR extraction)", type=["pdf", "png", "jpg", "jpeg"])
+# if mud_log:
+#     try:
+#         file_bytes = mud_log.getvalue()
+#         file_type = mud_log.type
+#         images = []
 
-        if 'pdf' in file_type.lower():
-            from pdf2image import convert_from_bytes
-            pil_images = convert_from_bytes(file_bytes)
-            images = [cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR) for pil_img in pil_images]
-        else:
-            img_array = np.frombuffer(file_bytes, np.uint8)
-            images = [cv2.imdecode(img_array, cv2.IMREAD_COLOR)]
+#         if 'pdf' in file_type.lower():
+#             from pdf2image import convert_from_bytes
+#             pil_images = convert_from_bytes(file_bytes)
+#             images = [cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR) for pil_img in pil_images]
+#         else:
+#             img_array = np.frombuffer(file_bytes, np.uint8)
+#             images = [cv2.imdecode(img_array, cv2.IMREAD_COLOR)]
 
-        # OCR on each image/page
-        text = ''
-        for img in images:
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-            text += pytesseract.image_to_string(thresh) + '\n'
+#         # OCR on each image/page
+#         text = ''
+#         for img in images:
+#             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+#             thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+#             text += pytesseract.image_to_string(thresh) + '\n'
 
-        # Parse text into data
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
-        parsed_bits = []
-        for line in lines:
-            parts = re.split(r'\s+', line)
-            if len(parts) >= 7:
-                try:
-                    bit_no = int(parts[0])
-                    size = parts[4]  # e.g., 17.5"
-                    depth_in = int(parts[6])
-                    parsed_bits.append({"Bit Number": bit_no, "Size": size, "Depth In": depth_in})
-                except (ValueError, IndexError):
-                    pass
+#         # Parse text into data
+#         lines = [line.strip() for line in text.split('\n') if line.strip()]
+#         parsed_bits = []
+#         for line in lines:
+#             parts = re.split(r'\s+', line)
+#             if len(parts) >= 7:
+#                 try:
+#                     bit_no = int(parts[0])
+#                     size = parts[4]  # e.g., 17.5"
+#                     depth_in = int(parts[6])
+#                     parsed_bits.append({"Bit Number": bit_no, "Size": size, "Depth In": depth_in})
+#                 except (ValueError, IndexError):
+#                     pass
         
-        if parsed_bits:
-            new_df = pd.DataFrame(parsed_bits)
-            st.session_state.bits_data = pd.concat([st.session_state.bits_data, new_df]).drop_duplicates().reset_index(drop=True)
-            st.success(f"Extracted {len(parsed_bits)} bits from mud log!")
-        else:
-            st.warning("No data extracted. Check file quality or enter manually.")
-    except Exception as e:
-        st.error(f"Processing error: {e}")
+#         if parsed_bits:
+#             new_df = pd.DataFrame(parsed_bits)
+#             st.session_state.bits_data = pd.concat([st.session_state.bits_data, new_df]).drop_duplicates().reset_index(drop=True)
+#             st.success(f"Extracted {len(parsed_bits)} bits from mud log!")
+#         else:
+#             st.warning("No data extracted. Check file quality or enter manually.")
+#     except Exception as e:
+#         st.error(f"Processing error: {e}")
 
 # ────────────────────────────────────────────────
 #   Data storage
