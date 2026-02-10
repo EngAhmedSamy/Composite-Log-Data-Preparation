@@ -734,36 +734,26 @@ with tab_mud_drlg_params:
                 mud_sheet = s
         
         # ─── Helper function to build quoted string ────────────────────────────
-        def build_quoted_text(parts, field_width=20):
-            """
-            Builds a quoted string where each parameter is left-aligned with fixed width.
-            Example output: "WOB: 1-5        RPM: 50+M     SPP: 630-820   GPM: 370      "
-            """
+        def build_quoted_text(parts, space_count=10):
             formatted = []
             i = 0
             while i < len(parts):
                 part = str(parts[i]).strip()
-                if part.endswith(':') or part in ['WOB', 'RPM', 'SPP', 'GPM', 'MWT', 'VIS', 'CL', 'K']:
-                    # Label → add space after colon if missing
-                    if not part.endswith(' '):
-                        part += ' '
+                if part.endswith(':'):
+                    label = part
                     i += 1
                     if i < len(parts):
-                        val = str(parts[i]).strip()
-                        # Combine label + value
-                        combined = part + val
-                        # Pad to fixed width
-                        formatted.append(combined.ljust(field_width))
+                        val = str(parts[i])  # NO strip to preserve spaces in value
+                        formatted.append(label + val)
                         i += 1
                     else:
-                        formatted.append(part.ljust(field_width))
+                        formatted.append(label)
                 else:
-                    # Just a value or other text
-                    formatted.append(part.ljust(field_width))
+                    formatted.append(str(parts[i]))  # no strip
                     i += 1
-            
-            # Join without extra spaces (padding already added)
-            return '"' + ''.join(formatted).rstrip() + '"'
+            # Join formatted pairs with specified number of spaces
+            spaces = ' ' * space_count
+            return '"' + spaces.join(formatted).strip() + '"'
 
         # ─── Process Drilling Parameters ────────────────────────────────────────
         if drilling_sheet:
@@ -789,7 +779,7 @@ with tab_mud_drlg_params:
                             d = int(float(depth_v))
                             param_text = ' '.join(text_parts)
                             param_text = param_text.replace(':', ': ')
-                            quoted_text = build_quoted_text(text_parts, field_width=20)   # ← 20 characters per parameter
+                            quoted_text = f'"{param_text}"'
                             data.append((d, quoted_text))
                         except:
                             continue
@@ -806,7 +796,7 @@ with tab_mud_drlg_params:
         
         # ─── Process Mud Parameters ─────────────────────────────────────────────
         # ─── Process Mud Parameters ─────────────────────────────────────────────
-        if mud_sheet:
+       if mud_sheet:
             try:
                 df = pd.read_excel(wb, sheet_name=mud_sheet, header=None, dtype=str, keep_default_na=False)
                 st.success(f"Mud sheet loaded: {mud_sheet}")
@@ -834,7 +824,7 @@ with tab_mud_drlg_params:
                             param_text = ' '.join(text_parts)
                             # Optional: add extra space around colons if needed
                             param_text = param_text.replace(':', ': ')
-                            quoted_text = build_quoted_text(text_parts, field_width=20)   # ← same width
+                            quoted_text = f'"{param_text}"'
                             data.append((d, quoted_text))
                         except:
                             continue
