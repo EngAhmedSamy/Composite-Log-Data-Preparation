@@ -126,25 +126,28 @@ with tab_gyro:
                     below = str(df.iloc[i+1, j]).strip().upper()
 
                     # MD column
-                    if ("MD" in cell or "Depth" in cell):
+                    if "MD" in cell or "DEPTH" in cell or "MEASURED DEPTH" in cell or "TVD" in cell:
                         if "FT" in below or pd.isna(below) or below == '':
                             md_col = j
 
                     # INC/ANG column
-                    if ("INC" in cell or "ANG" in cell):
+                    if "INC" in cell or "ANG" in cell or "INCLINATION" in cell or "ANGLE" in cell:
                         if "DEG" in below or pd.isna(below) or below == '':
                             inc_col = j
-
+                            
                     # AZI/AZ column
-                    if "AZI" in cell or "AZ" in cell:
-                        azi_col = j
+                    if "AZI" in cell or "AZ" in cell or "AZIMUTH" in cell:
+                        if "DEG" in below or pd.isna(below) or below == '':
+                            azi_col = j
+                        elif "DEG" in below or pd.isna(below) or below == '':
+                            azi_col = j
 
             # Fallback: if no match with unit, look for headers alone
             if md_col is None:
                 for i in range(len(df)):
                     for j in range(len(df.columns)):
                         cell = str(df.iloc[i, j]).strip().upper()
-                        if "MD" in cell or "Depth" in cell:
+                        if "MD" in cell or "DEPTH" in cell or "MEASURED DEPTH" in cell or "TVD" in cell:
                             md_col = j
                             break
                     if md_col is not None:
@@ -154,7 +157,7 @@ with tab_gyro:
                 for i in range(len(df)):
                     for j in range(len(df.columns)):
                         cell = str(df.iloc[i, j]).strip().upper()
-                        if "INC" in cell or "ANG" in cell:
+                        if "INC" in cell or "ANG" in cell or "INCLINATION" in cell or "ANGLE" in cell:
                             inc_col = j
                             break
                     if inc_col is not None:
@@ -164,7 +167,7 @@ with tab_gyro:
                 for i in range(len(df)):
                     for j in range(len(df.columns)):
                         cell = str(df.iloc[i, j]).strip().upper()
-                        if "AZI" in cell or "AZ" in cell:
+                        if "AZI" in cell or "AZ" in cell or "AZIMUTH" in cell:
                             azi_col = j
                             break
                     if azi_col is not None:
@@ -184,8 +187,11 @@ with tab_gyro:
                 # Data starts after header + unit row (or after header if no unit)
                 start_row = 0
                 for i in range(len(df)):
-                    if any(pd.notna(df.iloc[i, c]) for c in [md_col, inc_col, azi_col] if c is not None):
-                        start_row = i + 2  # skip header and unit
+                    if any(pd.notna(df.iloc[i, c]) and str(df.iloc[i, c]).upper() in ['FT', 'DEG'] for c in [md_col, inc_col, azi_col] if c is not None):
+                        start_row = i + 1  # unit row found, start after it
+                        break
+                    if any(pd.notna(df.iloc[i, c]) and str(df.iloc[i, c]).isdigit() for c in [md_col, inc_col, azi_col] if c is not None):
+                        start_row = i  # numeric data starts here
                         break
 
                 # Extract available columns
