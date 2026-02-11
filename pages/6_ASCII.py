@@ -126,7 +126,7 @@ with tab_gyro:
                     below = str(df.iloc[i+1, j]).strip().upper()
 
                     # MD column
-                    if "MD" in cell:
+                    if ("MD" in cell or "Depth" in cell):
                         if "FT" in below or pd.isna(below) or below == '':
                             md_col = j
 
@@ -144,7 +144,7 @@ with tab_gyro:
                 for i in range(len(df)):
                     for j in range(len(df.columns)):
                         cell = str(df.iloc[i, j]).strip().upper()
-                        if "MD" in cell:
+                        if "MD" in cell or "Depth" in cell:
                             md_col = j
                             break
                     if md_col is not None:
