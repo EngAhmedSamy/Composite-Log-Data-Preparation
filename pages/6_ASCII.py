@@ -846,6 +846,7 @@ with tab_mud_drlg_params:
                     i += 1
             
             # Join with NO extra spaces (padding is already inside each field)
+            quoted = ''.join(formatted).rstrip()  # rstrip to remove trailing spaces
             return '"' + ''.join(formatted) + '"'
         
         
